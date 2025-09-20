@@ -1,5 +1,5 @@
-﻿using GownApi.Dto;
-using GownsApi;
+﻿using GownApi.Model;
+using GownApi.Model.Dto;
 using Microsoft.EntityFrameworkCore;
 
 public class GownDb : DbContext
