@@ -43,6 +43,8 @@ app.MapFaqEndpoints();
 app.MapCeremonyEndoints();
 app.MapOrderEnpoints();
 app.MapItemsetsEndpoints();
+app.MapContactEndpoints();//Joe20250921
+
 
 //app.MapGet("/todoitems/complete", async (GownDb db) =>
 //    await db.degree.Where(t => t.IsComplete).ToListAsync());

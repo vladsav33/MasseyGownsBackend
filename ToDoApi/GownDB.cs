@@ -1,5 +1,8 @@
 ﻿using GownApi.Model;
 using GownApi.Model.Dto;
+using GownApi;
+using GownApi.Dto;
+using GownsApi;
 using Microsoft.EntityFrameworkCore;
 
 public class GownDb : DbContext
@@ -22,6 +25,7 @@ public class GownDb : DbContext
     public DbSet<HoodType> hoods => Set<HoodType>();
     public DbSet<ItemDegreeDto> ItemDegreeDtos { get; set; }  // optional
     public DbSet<ItemDegreeModel> ItemDegreeModels { get; set; }
+    public DbSet<Contacts> Contacts { get; set; } //Joe20250920
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
