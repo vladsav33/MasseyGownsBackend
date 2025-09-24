@@ -19,6 +19,7 @@ public class GownDb : DbContext
     public DbSet<Faq> faq => Set<Faq>();
     public DbSet<Sizes> sizes => Set<Sizes>();
     public DbSet<Fit> fit => Set<Fit>();
+    public DbSet<HoodType> hoods => Set<HoodType>();
     public DbSet<ItemDegreeDto> ItemDegreeDtos { get; set; }  // optional
     public DbSet<ItemDegreeModel> ItemDegreeModels { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,4 +1,4 @@
-﻿using GownApi.Dto;
+﻿using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,7 +10,7 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/itemsets", async (GownDb db) => {
                 var results = await db.Set<ItemDegreeModel>()
-                .FromSqlRaw(@"SELECT i.id, NULL as degree_id, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                .FromSqlRaw(@"SELECT i.id, NULL as degree_id, NULL as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
                     FROM public.items i
                     WHERE category='Set'")
                 .ToListAsync();

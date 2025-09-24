@@ -1,4 +1,5 @@
-﻿using GownsApi;
+﻿using GownApi.Model;
+using GownsApi;
 using Microsoft.EntityFrameworkCore;
 
 namespace GownApi.Endpoints

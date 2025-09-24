@@ -1,5 +1,6 @@
 ﻿namespace GownApi.Services;
-using GownApi.Dto;
+using GownApi.Model.Dto;
+
 public static class ItemMapper
 {
     public static ItemDegreeDto ToDto(ItemDegreeModel item)
@@ -10,6 +11,7 @@ public static class ItemMapper
         {
             Id = item.Id,
             DegreeId = item.DegreeId,
+            DegreeName = item.DegreeName,
             Name = item.Name,
             PictureBase64 = item.Picture != null ? Convert.ToBase64String(item.Picture) : null,
             HirePrice = item.HirePrice,

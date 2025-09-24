@@ -1,4 +1,4 @@
-﻿namespace GownsApi
+﻿namespace GownApi.Model
 {
     public class DegreesAndCeremonies
     {

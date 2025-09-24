@@ -1,7 +1,6 @@
 ﻿using GownsApi;
 using Npgsql;
 using Microsoft.EntityFrameworkCore;
-using GownApi.Dto;
 using GownApi.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);

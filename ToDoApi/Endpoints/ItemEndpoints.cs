@@ -1,4 +1,5 @@
-﻿using GownApi.Dto;
+﻿using GownApi.Model.Dto;
+using GownApi.Model;
 using GownApi.Services;
 using GownsApi;
 using Microsoft.EntityFrameworkCore;
@@ -12,11 +13,12 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/items/{id}", async (int id, GownDb db) => {
                 var results = await db.Database.SqlQueryRaw<ItemDegreeModel>(@"
-                    SELECT i.id, cd.degree_id, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                    SELECT DISTINCT i.id, cd.degree_id, d.name as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
                     FROM public.items i
-                    LEFT JOIN public.ceremony_degree_item cdi ON i.id = cdi.item_id
-                    LEFT JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id
-					WHERE i.id = {0}", id)
+                    INNER JOIN public.ceremony_degree_item cdi ON i.id = cdi.item_id
+                    INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id
+                    INNER JOIN public.degrees d ON cd.degree_id = d.id
+                    WHERE i.id = {0}", id)
                 .ToListAsync();
 
                 var itemsDto = ItemMapper.ToDtoList(results);
@@ -25,14 +27,26 @@ namespace GownApi.Endpoints
 
             app.MapGet("/items", async (GownDb db) => {
                 var results = await db.Set<ItemDegreeModel>()
-                .FromSqlRaw(@"SELECT i.id, g.degree_id, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                //.FromSqlRaw(@"SELECT i.id, NULL as degree_id, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                //    FROM public.items i")
+                //.ToListAsync();
+                .FromSqlRaw(@"SELECT DISTINCT i.id, g.degree_id, d.name as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
                     FROM public.ceremony_degree g
                     INNER JOIN public.ceremony_degree_item cdi ON g.id = cdi.ceremony_degree_id
-                    INNER JOIN public.items i on cdi.item_id = i.id")
+                    INNER JOIN public.items i ON cdi.item_id = i.id
+                    INNER JOIN public.degrees d ON g.degree_id = d.id")
                 .ToListAsync();
 
-                var itemsDto = ItemMapper.ToDtoList(results);
-                return Results.Ok(itemsDto);
+                var itemsDto = new List<ItemDto>();
+
+                foreach (var i in results)
+                {
+                    var itemDto = await Utils.GetOptions(i, db);
+                    itemsDto.Add(itemDto);
+                }
+
+                var itemsDtoList = itemsDto.ToList();
+                return Results.Ok(itemsDtoList);
             });
 
             app.MapPost("/items", async (ItemDto itemDto, GownDb db) =>
@@ -58,7 +72,7 @@ namespace GownApi.Endpoints
             app.MapGet("/itemsbydegree/{id}", async (int id, GownDb db) =>
             {
                 var results = await db.items
-                    .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                    .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, NULL as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
                     FROM public.ceremony_degree_item cdi
                     INNER JOIN public.items i on cdi.item_id = i.id
 					INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id

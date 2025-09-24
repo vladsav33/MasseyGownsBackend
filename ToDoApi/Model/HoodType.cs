@@ -1,6 +1,6 @@
-﻿namespace GownsApi
+﻿namespace GownApi.Model
 {
-    public class Degrees
+    public class HoodType
     {
         public int Id { get; set; }
         public string Name { get; set; }
