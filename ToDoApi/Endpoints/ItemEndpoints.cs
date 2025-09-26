@@ -3,7 +3,6 @@ using GownApi.Model;
 using GownApi.Services;
 using GownsApi;
 using Microsoft.EntityFrameworkCore;
-using System.Runtime.CompilerServices;
 
 namespace GownApi.Endpoints
 {

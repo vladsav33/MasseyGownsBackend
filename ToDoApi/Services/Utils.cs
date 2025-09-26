@@ -1,9 +1,5 @@
-﻿using GownApi.Model;
-using GownApi.Model.Dto;
-using GownsApi;
+﻿using GownApi.Model.Dto;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Reflection.Metadata.Ecma335;
 
 namespace GownApi.Services
 {
@@ -158,7 +154,7 @@ namespace GownApi.Services
                 }
             };
 
-            if (!hoods.IsNullOrEmpty())
+            if (hoods?.Any() == true)
             {
                 options.Add(new()
                 {

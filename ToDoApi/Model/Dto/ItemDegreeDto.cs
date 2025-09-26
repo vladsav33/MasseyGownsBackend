@@ -1,7 +1,4 @@
-﻿using Microsoft.AspNetCore.Connections.Features;
-using GownApi.Services;
-
-namespace GownApi.Model.Dto
+﻿namespace GownApi.Model.Dto
 {
     public class ItemDegreeDto
     {

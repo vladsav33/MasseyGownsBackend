@@ -1,10 +1,32 @@
-﻿using GownsApi;
-using Npgsql;
+﻿using GownApi;
 using Microsoft.EntityFrameworkCore;
 using GownApi.Endpoints;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("GownDb");
+
+var key = Encoding.ASCII.GetBytes("SuperSecretKey123!"); // 🔑 Use a secure key in production
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = false,
+        ValidateAudience = false
+    };
+});
 
 //Register the DbContext to use SQL Server (Azure SQL)
 builder.Services.AddDbContext<GownDb>(options =>
@@ -14,6 +36,9 @@ builder.Services.AddDbContext<GownDb>(options =>
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddEndpointsApiExplorer(); // Required for minimal APIs
 builder.Services.AddSwaggerGen();           // Adds Swagger generation
+
+builder.Services.AddAuthorization();
+builder.Services.AddControllers();
 
 builder.Services.AddCors(options =>
 {
@@ -28,6 +53,9 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseCors("AllowFrontend");  // enable it
 
@@ -44,6 +72,7 @@ app.MapCeremonyEndoints();
 app.MapOrderEnpoints();
 app.MapItemsetsEndpoints();
 app.MapContactEndpoints();//Joe20250921
+app.MapControllers();
 
 
 //app.MapGet("/todoitems/complete", async (GownDb db) =>

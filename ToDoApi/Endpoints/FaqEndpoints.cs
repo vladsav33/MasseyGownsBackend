@@ -1,6 +1,5 @@
 ﻿using GownApi.Model;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Protocols;
 
 namespace GownApi.Endpoints
 {
