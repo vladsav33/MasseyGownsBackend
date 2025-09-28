@@ -1,6 +1,6 @@
-﻿namespace GownApi.Model
+﻿namespace GownApi.Model.Dto
 {
-    public class Orders
+    public class OrderDto
     {
         public int Id { get; set; }
         public string FirstName { get; set; }
@@ -14,6 +14,7 @@
         public string Mobile { get; set; }
         public int StudentId { get; set; }
         public string? Message { get; set; }
+        public SelectedItem[] Items { get; set; }
         public bool Paid { get; set; }
         public int? PaymentMethod { get; set; }
         public string? PurchaseOrder { get; set; }

@@ -6,9 +6,9 @@ namespace GownApi.Services
     public interface IItemBase
     {
         int Id { get; }
-        int? DegreeId { get; }
+        //int? DegreeId { get; }
         string Name { get; }
-        string DegreeName { get; }
+        //string DegreeName { get; }
         byte[]? Picture { get; }
         float? HirePrice { get; set; }
         float? BuyPrice { get; set; }
@@ -19,24 +19,24 @@ namespace GownApi.Services
 
     public static class Utils
     {
-        public static async Task<ItemDto> GetOptions<T>(T items, GownDb db) where T : IItemBase
+        public static async Task<ItemDto> GetOptions(ItemDegreeModel items, GownDb db) // where T : IItemBase
         {
             var sizes = await db.sizes
-                .FromSqlRaw("SELECT s.size FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
+                .FromSqlRaw("SELECT s.id, s.size FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
                     items.Id)
-                .Select(s => s.Size)
+                .Select(s => new { s.Id, Value = s.Size })
                 .ToListAsync();
 
             var fit = await db.fit
-                .FromSqlRaw("SELECT DISTINCT f.fit_type FROM fit f INNER JOIN sku sk ON sk.fit_id = f.id WHERE sk.item_id = {0} order by f.fit_type",
+                .FromSqlRaw("SELECT DISTINCT f.id, f.fit_type FROM fit f INNER JOIN sku sk ON sk.fit_id = f.id WHERE sk.item_id = {0} order by f.fit_type",
                     items.Id)
-                .Select(f => f.FitType)
+                .Select(f => new { f.Id, Value = f.FitType })
                 .ToListAsync();
 
             var hoods = await db.hoods
-                .FromSqlRaw("SELECT h.name FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
+                .FromSqlRaw("SELECT h.id, h.name FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
                     items.Id)
-                .Select(h => h.Name)
+                .Select(h => new { h.Id, Value = h.Name })
                 .ToListAsync();
 
             var itemDto = new ItemDto
@@ -102,28 +102,28 @@ namespace GownApi.Services
             return itemDto;
         }
 
-        public static async Task<ItemDto> GetSetOptions<T>(T items, GownDb db) where T : IItemBase
+        public static async Task<ItemDto> GetSetOptions(ItemDegreeModel items, GownDb db) // where T : IItemBase
         {
             var sizes = await db.sizes
                 //.FromSqlRaw("SELECT s.size FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
                 //    items.Id)
-                .FromSqlRaw("SELECT s.size FROM sizes s INNER JOIN items i ON i.id = s.item_id WHERE s.item_id = {0} AND s.fit_id = 1",
+                .FromSqlRaw("SELECT s.id, s.size FROM sizes s INNER JOIN items i ON i.id = s.item_id WHERE s.item_id = {0} AND s.fit_id = 1",
                     items.Id)
-                .Select(s => s.Size)
+                .Select(s => new { s.Id, Value = s.Size })
                 .ToListAsync();
 
             var headSizes = await db.sizes
                 //.FromSqlRaw("SELECT s.size FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND sk.fit_id IS NULL",
                 //    items.Id)
-                .FromSqlRaw("SELECT s.size FROM sizes s INNER JOIN items i ON i.id = s.item_id WHERE s.item_id = {0} AND s.fit_id IS NULL",
+                .FromSqlRaw("SELECT s.id, s.size FROM sizes s INNER JOIN items i ON i.id = s.item_id WHERE s.item_id = {0} AND s.fit_id IS NULL",
                     items.Id)
-                .Select(s => s.Size)
+                .Select(s => new { s.Id, Value = s.Size })
                 .ToListAsync();
 
             var hoods = await db.hoods
-                .FromSqlRaw("SELECT h.name FROM items i INNER JOIN hood_type h ON h.item_id = i.id WHERE h.item_id = {0}",
+                .FromSqlRaw("SELECT h.id, h.name FROM items i INNER JOIN hood_type h ON h.item_id = i.id WHERE h.item_id = {0}",
                     items.Id)
-                .Select(h => h.Name)
+                .Select(h => new { h.Id, Value = h.Name })
                 .ToListAsync();
 
             var itemDto = new ItemDto

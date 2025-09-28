@@ -1,4 +1,6 @@
 ﻿using GownApi.Model;
+using GownApi.Model.Dto;
+using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Nodes;
@@ -22,9 +24,24 @@ namespace GownApi.Endpoints
                 return Results.Ok(order);
             });
 
-            app.MapPost("/orders", async (Orders order, GownDb db) =>
+            app.MapPost("/orders", async (OrderDto orderDto, GownDb db) =>
             {
+                var order = OrderMapper.FromDto(orderDto);
+
                 db.orders.Add(order);
+                db.SaveChanges();
+                foreach (var item in orderDto.Items) {
+                    var orderedItems = new OrderedItems
+                    {
+                        OrderId = order.Id,
+                        SkuId = item.ItemId,
+                        Quantity = item.Quantity,
+                        Hire = item.Hire,
+                        Cost = 50  // Replace with a value from DTO
+                    };
+                    db.orderedItems.Add(orderedItems);
+                }
+
                 await db.SaveChangesAsync();
 
                 return Results.Created($"/orders/{order.Id}", order);

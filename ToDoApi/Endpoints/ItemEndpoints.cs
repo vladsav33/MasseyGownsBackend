@@ -70,7 +70,7 @@ namespace GownApi.Endpoints
 
             app.MapGet("/itemsbydegree/{id}", async (int id, GownDb db) =>
             {
-                var results = await db.items
+                var results = await db.itemDegreeModels
                     .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, NULL as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
                     FROM public.ceremony_degree_item cdi
                     INNER JOIN public.items i on cdi.item_id = i.id

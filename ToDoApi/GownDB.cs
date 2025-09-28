@@ -23,7 +23,8 @@ namespace GownApi
         public DbSet<Fit> fit => Set<Fit>();
         public DbSet<HoodType> hoods => Set<HoodType>();
         public DbSet<ItemDegreeDto> ItemDegreeDtos { get; set; }  // optional
-        public DbSet<ItemDegreeModel> ItemDegreeModels { get; set; }
+        public DbSet<ItemDegreeModel> itemDegreeModels { get; set; }
+        public DbSet<OrderedItems> orderedItems { get; set; } 
         public DbSet<Contacts> Contacts { get; set; } //Joe20250920
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
