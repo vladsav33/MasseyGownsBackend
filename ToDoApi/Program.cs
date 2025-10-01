@@ -40,12 +40,15 @@ builder.Services.AddSwaggerGen();           // Adds Swagger generation
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
+builder.Services.AddHttpClient();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy =>
         {
             policy.WithOrigins("http://localhost:5173",
+                               "http://localhost:5174",                           
                                "https://masseygowns-bzhkgzfubkavgchw.newzealandnorth-01.azurewebsites.net")  // allow frontend to prevent CORS errors
                   .AllowAnyHeader()
                   .AllowAnyMethod();
@@ -72,6 +75,8 @@ app.MapCeremonyEndoints();
 app.MapOrderEnpoints();
 app.MapItemsetsEndpoints();
 app.MapContactEndpoints();//Joe20250921
+app.MapDeliveryEndpoints();
+app.MapPaymentEndpoints();
 app.MapControllers();
 
 

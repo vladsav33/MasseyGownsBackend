@@ -12,16 +12,31 @@ namespace GownApi.Endpoints
         public static void MapOrderEnpoints(this WebApplication app)
         {
             app.MapGet("/orders", async (GownDb db) =>
-                await db.orders.ToListAsync());
+            {
+                var result = await db.orders.ToListAsync();
+                var resultList = new List<OrderDtoOut>();
 
-            app.MapGet("/orders/{id}", async (int id, GownDb db, ILogger < Program > logger) =>
+                foreach (var res in result)
+                {
+                    var order = await OrderMapper.ToDtoOut(res, db);
+                    resultList.Add(order);
+                }
+                return Results.Ok(resultList);
+            });
+
+        app.MapGet("/orders/{id}", async (int id, GownDb db, ILogger < Program > logger) =>
             {
                 var order = await db.orders.FindAsync(id);
 
                 logger.LogInformation("GET /orders/id called with ID={id}", id);
                 if (order is null)
+                {
+                    logger.LogInformation("order is null");
+
                     return Results.NotFound();
-                return Results.Ok(order);
+                }
+                var results = await OrderMapper.ToDtoOut(order, db);
+                return Results.Ok(results);
             });
 
             app.MapPost("/orders", async (OrderDto orderDto, GownDb db) =>
@@ -31,13 +46,14 @@ namespace GownApi.Endpoints
                 db.orders.Add(order);
                 db.SaveChanges();
                 foreach (var item in orderDto.Items) {
+                    var itemNew = await db.items.FindAsync(item.ItemId);
                     var orderedItems = new OrderedItems
                     {
                         OrderId = order.Id,
-                        SkuId = item.ItemId,
+                        SkuId = item.ItemId, // It stores itemId, should store SkuId instead
                         Quantity = item.Quantity,
                         Hire = item.Hire,
-                        Cost = 50  // Replace with a value from DTO
+                        Cost = item.Hire ? itemNew.HirePrice : itemNew.BuyPrice
                     };
                     db.orderedItems.Add(orderedItems);
                 }

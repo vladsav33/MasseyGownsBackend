@@ -25,6 +25,7 @@ namespace GownApi
         public DbSet<ItemDegreeDto> ItemDegreeDtos { get; set; }  // optional
         public DbSet<ItemDegreeModel> itemDegreeModels { get; set; }
         public DbSet<OrderedItems> orderedItems { get; set; } 
+        public DbSet<SelectedItemOut> selectedItemOut { get; set; }
         public DbSet<Contacts> Contacts { get; set; } //Joe20250920
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

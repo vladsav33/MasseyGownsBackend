@@ -99,6 +99,16 @@ namespace GownApi.Services
                                         }
                                     };
             }
+            if (items.Category == "Delivery")
+            {
+                itemDto.Options = new List<Dictionary<string, object>> {
+                                        new () {
+                                            ["label"] = "Delivery Type",
+                                            ["value"] = sizes[0],
+                                            ["choices"] = sizes
+                                        }
+                                    };
+            }
             return itemDto;
         }
 

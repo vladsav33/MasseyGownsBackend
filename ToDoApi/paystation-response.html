@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta name="robots" content="noindex,nofollow">
+	<meta http-equiv="content-type" content="text/html;charset=utf-8">
+	<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>Paystation Hosted Payments</title>
+	<link rel="icon" type="image/png" href="/favicon.ico?20250908">
+	<link rel="stylesheet" href="/hosted/elements/css/responsive.css?20250908"/>
+		<script src="/hosted/elements/js/jquery.min.js"></script>
+	<script src="/hosted/elements/js/cleave.min.js"></script>
+	<script src="/hosted/elements/js/paystation.js?20250908"></script>
+	<script nonce="cab385d1bbb04f07">
+		var page = document.getElementById("page-content");
+        if (page) {
+            page.addEventListener("load", function () {
+                setBackgroundColour('');
+            });
+        }
+	</script>
+</head>
+<body class="page-content" id="page-content">
+<div class="flex payment-top-margin hide-inside-iframes"></div>
+<div class="row">
+	<div class="flex"></div>
+	<div class="center-column">
+		<div class="test-mode" onclick="this.style.display='none'" title="Click to hide">TEST MODE</div><div class="merchant-title hide-inside-iframes">Massey Gowns Test</div><input type="hidden" id="total_amount" value="&#36;20.00"><input type="hidden" id="base_amount" value="&#36;20.00"><input type="hidden" id="surcharge_amount" value="">    <div id="transaction-result" class="transaction-result" style="display: none"></div>
+    <div id="loader" class="loader" style="display: none"></div>
+    <iframe id="acs_method_iframe" name="acs_method_iframe" style="display:none"></iframe>
+
+    <div class="payment-wrapper" style="display: none">
+        <div class="paystation-fold"></div>
+        <div class="payment-amount-box">
+	<span id="payment-amount" class="payment-amount">&#36;20.00</span>
+	<span class="payment-currency">NZD</span>
+	</div>        <div id="payment-types-box">
+            <div class="payment-subheading">How would you like to pay?</div>
+            <div id="payment-type-wrapper">
+                                    <div class="payment-type">
+                        <button class="payment-type-button" value="CREDIT_CARD">Credit Card</button>
+                                                <div class="payment-type-icons"><img src="/hosted/elements/img/responsive_card_logos/logo-mastercard-border.gif" alt="Mastercard"><img src="/hosted/elements/img/responsive_card_logos/logo-visa-border.gif" alt="Visa"></div>
+                    </div>
+                                </div>
+        </div>
+        <div id="payment-form-wrapper" style="display: none;">
+            <div class="payment-type-form" id="CREDIT_CARD" style="display:none">
+                <div class="payment-subheading">
+                    <button class="payment-back-link">Back</button>
+                    Enter card details
+                </div>
+                <div class="payment-type-icons-details"><img src="/hosted/elements/img/responsive_card_logos/logo-mastercard-border.gif" alt="Mastercard"><img src="/hosted/elements/img/responsive_card_logos/logo-visa-border.gif" alt="Visa"></div>
+                <form>
+                    <input type="hidden" id="service" name="service" value="api">
+                    <input type="hidden" id="future_pay" name="future_pay" value="N">
+                    <input type="hidden" id="future_pay_save_only" name="future_pay_save_only" value="N">
+                    <input type="hidden" id="use_card_security_code" name="use_card_security_code" value="Y">
+                    <input type="hidden" id="enforce_card_security_code" name="enforce_card_security_code" value="Y">
+                    <input type="hidden" id="enforce_card_security_code_3party" name="enforce_card_security_code_3party" value="Y">
+                    <input type="hidden" id="enforce_card_security_code_futurepay" name="enforce_card_security_code_futurepay" value="Y">
+                    <input type="hidden" id="use_card_holder_name" name="use_card_holder_name" value="Y">
+                    <input type="hidden" id="use_card_expiry" name="use_card_expiry" value="Y">
+                    <input type="hidden" id="shopify" name="shopify" value="N">
+
+                    <input type="hidden" id="expiryyear" name="expiryyear">
+                    <input type="hidden" id="expirymonth" name="expirymonth">
+
+                    <label for="cardnumber"></label>
+                    <input type="tel" autofocus placeholder="Card number" pattern="[0-9]*" maxlength="24" id="cardnumber" name="cardnumber" class="creditcard-icon" autocomplete="cc-number" spellcheck="false"/>
+                    <p id="save_card_msg" style="display: none;">Note: Card will be stored for future use.</p>
+
+                                            <div id="expiry-wrapper">
+                                                        <input type="tel" id="expirydate" name="expirydate" class="calender-icon" placeholder="MM/YY" autocomplete="cc-exp" spellcheck="false"/>
+                                                            <input type="tel" id="cardverificationcode" name="cardverificationcode" title="Security code" pattern="[0-9]*" placeholder="CSC" class="cvc-icon" maxlength="4" autocomplete="cc-csc" spellcheck="false"/>
+                                                    </div>
+                        <label for="expirydate"></label>
+                        <label for="cardverificationcode"></label>
+                                                    <div id="cvc-help-button">
+                            <div class="cvc-help-questionmark">?</div>
+                            <span class="help-content" id="csc_help">
+                                Visa, MasterCard, Q Card and Diners cards have a three digit code on the back.
+                                                            </span>
+                            </div>
+                                                    <label for="cardholder"></label>
+                        <input type="text" id="cardholder" name="cardholder" placeholder="Cardholder name" class="card-icon" autocomplete="cc-name" maxlength="40"/>
+                                            <div class="center">
+                                        </div>
+                    <div class="center">
+                        <button class="payment-button">Pay</button>
+                                            </div>
+                </form>
+            </div>
+
+            <div class="payment-type-form" id="POLI" style="display:none">
+                <p class="redirect-message">Redirecting to POLi...</p>
+                <div class="loader"></div>
+            </div>
+
+            <div class="payment-type-form" id="UNIONPAY" style="display:none">
+                <p class="redirect-message">Redirecting to UnionPay...</p>
+                <div class="loader"></div>
+            </div>
+        </div>
+    </div>
+    <script nonce="cab385d1bbb04f07">
+                setTimeout(function () {
+            _initialResponse = {"transaction_id":"225817619","timeout":false,"complete":false,"successful":false,"error_code":"","error_message":"","return_url":"noreturn?ms=2a12c3a0-313f-4b3c-99d7-567b35244bac&ti=0225817619-01&am=2000&gw=DEVELOPMENT&ru=https%3a%2f%2fyourdomain.com%2fcheckout","future_pay":false,"future_pay_save_only":false,"use_card_expiry":true,"use_card_security_code":true,"use_card_holder_name":true,"transaction_status":null};
+            initPaymentPage("hk=G9j2hraDo2l_4jXO06cIqG-XYhCUf4kFi0fqZQRVaRM");
+                        cardDetails('CREDIT_CARD');
+                    }, 15);
+    </script>
+		<span id="paystation-logo" class="paystation-logo hide-inside-iframes"></span>
+	</div>
+	<div class="flex"></div>
+</div>
+<div class="flex hide-inside-iframes" id="iframe-display"></div>
+</body>
+</html>
