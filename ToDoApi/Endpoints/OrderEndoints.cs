@@ -2,8 +2,8 @@
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using System.Text.Json.Nodes;
+//using Microsoft.Extensions.Logging;
+//using System.Text.Json.Nodes;
 
 namespace GownApi.Endpoints
 {
@@ -39,7 +39,7 @@ namespace GownApi.Endpoints
                 return Results.Ok(results);
             });
 
-            app.MapPost("/orders", async (OrderDto orderDto, GownDb db) =>
+            app.MapPost("/orders", async (OrderDto orderDto, GownDb db, ILogger<Program> logger) =>
             {
                 var order = OrderMapper.FromDto(orderDto);
 
@@ -47,10 +47,21 @@ namespace GownApi.Endpoints
                 db.SaveChanges();
                 foreach (var item in orderDto.Items) {
                     var itemNew = await db.items.FindAsync(item.ItemId);
+                    var skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId);
+
+                    logger.LogInformation("Looking for SKU with itemId: {0}, SizeId: {1}, FitId: {2}, HoodId: {3}",
+                        item.ItemId, item.SizeId, item.FitId, item.HoodId);
+
+                    if (!skuId.Any()) {
+                        db.Sku.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId });
+                        await db.SaveChangesAsync();
+                    } else { 
+                        logger.LogInformation("Found Sku Id: {0}", skuId[0].Id);
+                    }
                     var orderedItems = new OrderedItems
                     {
                         OrderId = order.Id,
-                        SkuId = item.ItemId, // It stores itemId, should store SkuId instead
+                        SkuId = skuId[0].Id, // It stores itemId, should store SkuId instead
                         Quantity = item.Quantity,
                         Hire = item.Hire,
                         Cost = item.Hire ? itemNew.HirePrice : itemNew.BuyPrice
@@ -58,7 +69,9 @@ namespace GownApi.Endpoints
                     db.orderedItems.Add(orderedItems);
                 }
 
-                await db.SaveChangesAsync();
+                var result = await db.SaveChangesAsync();
+
+                logger.LogInformation("POST /orders called, result: {id}", result);
 
                 return Results.Created($"/orders/{order.Id}", order);
             });

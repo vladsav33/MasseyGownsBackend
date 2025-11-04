@@ -32,7 +32,7 @@ namespace GownApi.Endpoints
                     { "pstn_am", request.Amount.ToString() }, // Amount in cents (e.g. 1000 = $10.00)
                     { "pstn_ms", Guid.NewGuid().ToString() }, // Merchant session ID
                     { "pstn_nr", "t" },                     // test/live flag
-                    { "ru", ReturnUrl }                     // Return URL (optional depending on flow)
+                    //{ "pstn_du", ReturnUrl }                // Return URL (optional depending on flow)
                 };
 
                 var content = new FormUrlEncodedContent(values);

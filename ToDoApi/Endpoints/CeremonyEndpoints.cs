@@ -9,9 +9,13 @@ namespace GownApi.Endpoints
     {
         public static void MapCeremonyEndoints(this WebApplication app)
         {
-            app.MapGet("/ceremonies", async (GownDb db) =>
-                    await db.ceremonies.ToListAsync());
+            app.MapGet("/ceremonies", async (bool? all, GownDb db) => {
+                if (all == true)
+                    return await db.ceremonies.OrderBy(c => c.Name.Contains("Casual")).ThenBy(c => c.Name).ToListAsync();
 
+                return await db.ceremonies.Where(c => c.Visible).OrderBy(c => c.Name.Contains("Casual")).ThenBy(c => c.Name).ToListAsync();
+            });
+         
             app.MapPost("/ceremonies", async (Ceremonies ceremony, GownDb db) =>
             {
                 db.ceremonies.Add(ceremony);
@@ -39,6 +43,7 @@ namespace GownApi.Endpoints
                 // Update fields
                 ceremony.Name = updatedCeremony.Name;
                 ceremony.DueDate = updatedCeremony.DueDate;
+                ceremony.Visible = updatedCeremony.Visible;
 
                 await db.SaveChangesAsync();
 
