@@ -18,5 +18,7 @@
         public int? PaymentMethod { get; set; }
         public string? PurchaseOrder { get; set; }
         public DateOnly OrderDate { get; set; }
+        public int? CeremonyId { get; set; }
+        public int? DegreeId { get; set; }
     }
 }

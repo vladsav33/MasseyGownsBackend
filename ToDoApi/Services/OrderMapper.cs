@@ -28,7 +28,9 @@ namespace GownApi.Services
                 Paid = orderDto.Paid,
                 PaymentMethod = orderDto.PaymentMethod,
                 PurchaseOrder = orderDto.PurchaseOrder,
-                OrderDate = orderDto.OrderDate
+                OrderDate = orderDto.OrderDate,
+                DegreeId = orderDto.DegreeId,
+                CeremonyId = orderDto.CeremonyId,
             };
         }
 
@@ -38,21 +40,17 @@ namespace GownApi.Services
                 return null;
 
             var items = await db.selectedItemOut
-                    .FromSqlRaw(@"SELECT oi.id, i.name as item_name, size as size_name, f.fit_type as fit_name, h.name as hood_name, hire, quantity
+                    .FromSqlRaw(@"SELECT oi.id, i.name as item_name, size as size_name, d.labeldegree, s.labelsize, f.fit_type as fit_name, h.name as hood_name, hire, quantity
                                   FROM ordered_items oi
                                   INNER JOIN sku sk ON sk.id = oi.sku_id
+                                  INNER JOIN orders o ON oi.order_id = o.id
+                                  INNER JOIN degrees d ON o.degree_id = d.id
                                   INNER JOIN items i ON i.id = sk.item_id
                                   LEFT JOIN sizes s ON s.id = sk.size_id
                                   LEFT JOIN fit f ON f.id = sk.fit_id
                                   LEFT JOIN hood_type h ON h.id = sk.hood_id
                                   WHERE oi.order_id = {0}", order.Id)
                     .ToArrayAsync();
-
-            //var items
-            //foreach( var item in items )
-            //{
-
-            //}
 
             return new OrderDtoOut
             {
@@ -72,7 +70,9 @@ namespace GownApi.Services
                 PaymentMethod = order.PaymentMethod,
                 PurchaseOrder = order.PurchaseOrder,
                 OrderDate = order.OrderDate,
-                Items = items
+                Items = items,
+                CeremonyId = order.CeremonyId,
+                DegreeId = order.DegreeId
             };
         }
 

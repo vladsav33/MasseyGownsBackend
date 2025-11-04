@@ -22,7 +22,7 @@ namespace GownApi.Services
         public static async Task<ItemDto> GetOptions(ItemDegreeModel items, GownDb db) // where T : IItemBase
         {
             var sizes = await db.sizes
-                .FromSqlRaw("SELECT s.id, s.size FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
+                .FromSqlRaw("SELECT s.id, s.size, s.labelsize FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
                     items.Id)
                 .Select(s => new { s.Id, Value = s.Size })
                 .ToListAsync();
