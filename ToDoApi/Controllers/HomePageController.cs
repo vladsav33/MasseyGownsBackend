@@ -52,8 +52,8 @@ namespace GownApi
         /// update the database, and delete the previous hero image if it exists.
         /// </summary>
         [HttpPost("hero-image")]
-        [Authorize] // 如果暂时还没准备好做 JWT，可以先注释掉这一行
-        public async Task<IActionResult> UploadHeroImage([FromForm] IFormFile file)
+        [Authorize] 
+        public async Task<IActionResult> UploadHeroImage(IFormFile file)
         {
             // Local helper to standardize API responses.
             IActionResult ApiResponse(bool success, string? message = null, object? data = null, int statusCode = 200)
