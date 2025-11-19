@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Azure.Storage;
 using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,12 +36,6 @@ builder.Services.AddDbContext<GownDb>(options =>
     options
            .UseNpgsql(connectionString)
            .UseSnakeCaseNamingConvention());
-builder.Services.AddSingleton(sp =>
-{
-    var configuration = sp.GetRequiredService<IConfiguration>();
-    var connectionString = configuration.GetConnectionString("AzureBlobStorage");
-    return new BlobServiceClient(connectionString);
-});//Joe 18/11/2025
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddEndpointsApiExplorer(); // Required for minimal APIs
@@ -66,6 +61,27 @@ builder.Services.AddCors(options =>
                   .AllowAnyMethod();
         });
 });
+
+// Joe 2025-11-19: register BlobServiceClient using env vars in Azure
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+
+    var accountName = config["StorageAccountName"];
+    var accountKey = config["StorageAccountKey"];
+
+    if (string.IsNullOrEmpty(accountName) || string.IsNullOrEmpty(accountKey))
+    {
+        throw new InvalidOperationException(
+            "StorageAccountName or StorageAccountKey is not configured.");
+    }
+
+    var credential = new StorageSharedKeyCredential(accountName, accountKey);
+    var blobUri = new Uri($"https://{accountName}.blob.core.windows.net");
+
+    return new BlobServiceClient(blobUri, credential);
+});
+
 
 var app = builder.Build();
 
@@ -94,5 +110,26 @@ app.MapControllers();
 
 //app.MapGet("/todoitems/complete", async (GownDb db) =>
 //    await db.degree.Where(t => t.IsComplete).ToListAsync());
+
+app.MapGet("/test-blob", async (BlobServiceClient blobClient) =>
+{
+    try
+    {
+        var containers = blobClient.GetBlobContainersAsync();
+        var list = new List<string>();
+
+        await foreach (var container in containers)
+        {
+            list.Add(container.Name);
+        }
+
+        return Results.Ok(list);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
 
 app.Run();
