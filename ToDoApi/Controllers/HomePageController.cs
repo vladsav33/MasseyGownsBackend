@@ -42,7 +42,7 @@ namespace GownApi
         }
 
         [HttpPost("hero-image")]
-        public async Task<IActionResult> UploadHeroImage([FromForm] IFormFile file)
+        public async Task<IActionResult> UploadHeroImage(IFormFile file)
         {
             if (file == null || file.Length == 0)
             {
