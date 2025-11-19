@@ -52,7 +52,7 @@ namespace GownApi
         /// update the database, and delete the previous hero image if it exists.
         /// </summary>
         [HttpPost("hero-image")]
-        [Authorize] 
+        // [Authorize] // temporarily disabled for testing from Swagger
         public async Task<IActionResult> UploadHeroImage(IFormFile file)
         {
             // Local helper to standardize API responses.
