@@ -1,9 +1,11 @@
 ﻿using GownApi;
-using Microsoft.EntityFrameworkCore;
 using GownApi.Endpoints;
+using GownApi.Model;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("GownDb");
@@ -33,6 +35,13 @@ builder.Services.AddDbContext<GownDb>(options =>
     options
            .UseNpgsql(connectionString)
            .UseSnakeCaseNamingConvention());
+builder.Services.AddSingleton(sp =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var connectionString = configuration.GetConnectionString("AzureBlobStorage");
+    return new BlobServiceClient(connectionString);
+});//Joe 18/11/2025
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddEndpointsApiExplorer(); // Required for minimal APIs
 builder.Services.AddSwaggerGen();           // Adds Swagger generation
@@ -41,6 +50,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
 builder.Services.AddHttpClient();
+
+builder.Services.Configure<PaystationOptions>(
+    builder.Configuration.GetSection("Paystation"));//Joe 20251004 bind the Paystation section of appsettings.json to PaystationOptions class
 
 builder.Services.AddCors(options =>
 {

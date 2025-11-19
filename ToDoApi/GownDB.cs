@@ -27,7 +27,10 @@ namespace GownApi
         public DbSet<OrderedItems> orderedItems { get; set; } 
         public DbSet<SelectedItemOut> selectedItemOut { get; set; }
         public DbSet<Contacts> Contacts { get; set; } //Joe20250920
+
         public DbSet<Sku> Sku { get; set; }
+
+        public DbSet<HomePageSettings> HomePageSettings { get; set; } //Joe20251118
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
