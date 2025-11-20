@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-
 namespace GownApi
 {
     [ApiController]
@@ -32,7 +31,33 @@ namespace GownApi
         }
 
         /// <summary>
-        /// Get current home page settings (hero image URL).
+        /// Standardized API response wrapper.
+        /// </summary>
+        private IActionResult ApiResponse(
+            bool success,
+            string? message = null,
+            object? data = null,
+            int statusCode = 200)
+        {
+            var body = new
+            {
+                success,
+                message,
+                data
+            };
+
+            return statusCode switch
+            {
+                200 => Ok(body),
+                400 => BadRequest(body),
+                500 => StatusCode(500, body),
+                _ => StatusCode(statusCode, body)
+            };
+        }
+
+        /// <summary>
+        /// Get current home page settings (simple shape).
+        /// GET /api/HomePage
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> Get()
@@ -49,32 +74,37 @@ namespace GownApi
         }
 
         /// <summary>
+        /// Get current hero image URL with standardized response.
+        /// GET /api/HomePage/hero-image
+        /// </summary>
+        [HttpGet("hero-image")]
+        public async Task<IActionResult> GetHeroImage()
+        {
+            var settings = await _db.HomePageSettings
+                .FirstOrDefaultAsync(x => x.Id == 1);
+
+            var heroImageUrl = settings?.HeroImageUrl;
+
+            return ApiResponse(
+                success: true,
+                message: "Hero image loaded successfully.",
+                data: new
+                {
+                    heroImageUrl
+                },
+                statusCode: 200
+            );
+        }
+
+        /// <summary>
         /// Upload a new hero image, store it in Blob Storage,
         /// update the database, and delete the previous hero image if it exists.
+        /// POST /api/HomePage/hero-image
         /// </summary>
         [HttpPost("hero-image")]
-        // [Authorize] // temporarily disabled for testing from Swagger
+        // [Authorize] // enable this when auth is ready
         public async Task<IActionResult> UploadHeroImage(IFormFile file)
         {
-            // Local helper to standardize API responses.
-            IActionResult ApiResponse(bool success, string? message = null, object? data = null, int statusCode = 200)
-            {
-                var body = new
-                {
-                    success,
-                    message,
-                    data
-                };
-
-                return statusCode switch
-                {
-                    200 => Ok(body),
-                    400 => BadRequest(body),
-                    500 => StatusCode(500, body),
-                    _ => StatusCode(statusCode, body)
-                };
-            }
-
             // 1. Basic file checks
             if (file == null || file.Length == 0)
             {
@@ -175,7 +205,7 @@ namespace GownApi
                 }
                 catch
                 {
-                    // Swallow errors from deleting old blobs to avoid breaking the main operation.
+                    // Ignore failures when deleting old blobs.
                 }
             }
 
