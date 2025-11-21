@@ -12,8 +12,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GownApi
 {
+    public class UpdateCeremonyTextRequest
+    {
+        public string? Text { get; set; }
+    }
     [ApiController]
     [Route("api/[controller]")]
+
     public class HomePageController : ControllerBase
     {
         private readonly GownDb _db;
@@ -95,6 +100,45 @@ namespace GownApi
                 statusCode: 200
             );
         }
+
+        /// Get current ceremony image URL
+        [HttpGet("ceremony-image")]
+        public async Task<IActionResult> GetCeremonyImage()
+        {
+            var settings = await _db.HomePageSettings
+                .FirstOrDefaultAsync(x => x.Id == 1);
+
+            var ceremonyImageUrl = settings?.CeremonyImageUrl;
+
+            return ApiResponse(
+                success: true,
+                message: "Ceremony image loaded successfully.",
+                data: new
+                {
+                    ceremonyImageUrl
+                },
+                statusCode: 200
+            );
+        }
+
+        /// Get ceremony text
+        [HttpGet("ceremony-text")]
+        public async Task<IActionResult> GetCeremonyText()
+        {
+            var settings = await _db.HomePageSettings
+                .FirstOrDefaultAsync(x => x.Id == 1);
+
+            return ApiResponse(
+                success: true,
+                message: "Ceremony text loaded successfully.",
+                data: new
+                {
+                    ceremonyText = settings?.CeremonyText
+                },
+                statusCode: 200
+            );
+        }
+
 
         /// <summary>
         /// Upload a new hero image, store it in Blob Storage,
@@ -220,5 +264,152 @@ namespace GownApi
                 statusCode: 200
             );
         }
+
+        /// Upload a new ceremony image
+        [HttpPost("ceremony-image")]
+        public async Task<IActionResult> UploadCeremonyImage(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return ApiResponse(false, "No file uploaded.", statusCode: 400);
+            }
+
+            long maxFileSize = 5 * 1024 * 1024;
+            if (file.Length > maxFileSize)
+            {
+                return ApiResponse(false, "File size cannot exceed 5 MB.", statusCode: 400);
+            }
+
+            var allowedContentTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+            if (!allowedContentTypes.Contains(file.ContentType))
+            {
+                return ApiResponse(false, "Only JPG, PNG, and WEBP images are allowed.", statusCode: 400);
+            }
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (string.IsNullOrEmpty(extension) ||
+                (extension != ".jpg" && extension != ".jpeg" && extension != ".png" && extension != ".webp"))
+            {
+                return ApiResponse(false, "Invalid file extension.", statusCode: 400);
+            }
+
+            var containerName = _configuration.GetSection("BlobStorage")["HeroContainer"];
+            if (string.IsNullOrEmpty(containerName))
+            {
+                return ApiResponse(false, "Blob container name is not configured.", statusCode: 500);
+            }
+
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync();
+            await containerClient.SetAccessPolicyAsync(PublicAccessType.Blob);
+
+            var blobName = $"ceremony-{Guid.NewGuid()}{extension}";
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            var headers = new BlobHttpHeaders
+            {
+                ContentType = file.ContentType
+            };
+
+            var uploadOptions = new BlobUploadOptions
+            {
+                HttpHeaders = headers
+            };
+
+            using (var stream = file.OpenReadStream())
+            {
+                await blobClient.UploadAsync(stream, uploadOptions);
+            }
+
+            var newCeremonyImageUrl = blobClient.Uri.ToString();
+
+            var settings = await _db.HomePageSettings
+                .FirstOrDefaultAsync(x => x.Id == 1);
+
+            var oldCeremonyImageUrl = settings?.CeremonyImageUrl;
+
+            if (settings == null)
+            {
+                settings = new HomePageSettings
+                {
+                    Id = 1,
+                    CeremonyImageUrl = newCeremonyImageUrl,
+                    UpdateAt = DateTime.UtcNow
+                };
+                _db.HomePageSettings.Add(settings);
+            }
+            else
+            {
+                settings.CeremonyImageUrl = newCeremonyImageUrl;
+                settings.UpdateAt = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync();
+
+            if (!string.IsNullOrEmpty(oldCeremonyImageUrl))
+            {
+                try
+                {
+                    var oldUri = new Uri(oldCeremonyImageUrl);
+                    var oldBlobName = Path.GetFileName(oldUri.AbsolutePath);
+                    var oldBlobClient = containerClient.GetBlobClient(oldBlobName);
+                    await oldBlobClient.DeleteIfExistsAsync();
+                }
+                catch
+                {
+                }
+            }
+
+            return ApiResponse(
+                success: true,
+                message: "Ceremony image updated successfully.",
+                data: new
+                {
+                    ceremonyImageUrl = newCeremonyImageUrl
+                },
+                statusCode: 200
+            );
+        }
+
+        /// Upload a new ceremony text
+
+        [HttpPost("ceremony-text")]
+        public async Task<IActionResult> UpdateCeremonyText([FromBody] UpdateCeremonyTextRequest request)
+        {
+            var newText = request?.Text ?? string.Empty;
+
+            var settings = await _db.HomePageSettings
+                .FirstOrDefaultAsync(x => x.Id == 1);
+
+            if (settings == null)
+            {
+                settings = new HomePageSettings
+                {
+                    Id = 1,
+                    CeremonyText = newText,
+                    UpdateAt = DateTime.UtcNow
+                };
+                _db.HomePageSettings.Add(settings);
+            }
+            else
+            {
+                settings.CeremonyText = newText;
+                settings.UpdateAt = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync();
+
+            return ApiResponse(
+                success: true,
+                message: "Ceremony text updated successfully.",
+                data: new
+                {
+                    ceremonyText = newText
+                },
+                statusCode: 200
+            );
+        }
+
+
     }
 }
