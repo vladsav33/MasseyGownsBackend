@@ -68,6 +68,8 @@ app.UseSwagger();
 app.UseSwaggerUI();
 //}
 
+app.AdminItemsEndpoints();
+app.AdminDegreeEndpoints();
 app.MapDegreeEndpoints();
 app.MapItemEndpoints();
 app.MapFaqEndpoints();

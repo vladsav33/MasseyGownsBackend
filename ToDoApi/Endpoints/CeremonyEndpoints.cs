@@ -11,9 +11,9 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/ceremonies", async (bool? all, GownDb db) => {
                 if (all == true)
-                    return await db.ceremonies.OrderBy(c => c.Name.Contains("Casual")).ThenBy(c => c.Name).ToListAsync();
+                    return await db.ceremonies.Where(c => !c.Name.Contains("Casual")).OrderBy(c => c.Name).ToListAsync();
 
-                return await db.ceremonies.Where(c => c.Visible).OrderBy(c => c.Name.Contains("Casual")).ThenBy(c => c.Name).ToListAsync();
+                return await db.ceremonies.Where(c => c.Visible && !c.Name.Contains("Casual")).OrderBy(c => c.Name).ToListAsync();
             });
          
             app.MapPost("/ceremonies", async (Ceremonies ceremony, GownDb db) =>

@@ -22,9 +22,9 @@ namespace GownApi.Services
         public static async Task<ItemDto> GetOptions(ItemDegreeModel items, GownDb db) // where T : IItemBase
         {
             var sizes = await db.sizes
-                .FromSqlRaw("SELECT s.id, s.size, s.labelsize FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
+                .FromSqlRaw("SELECT s.id, s.size, s.labelsize, s.price FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
                     items.Id)
-                .Select(s => new { s.Id, Value = s.Size })
+                .Select(s => new { s.Id, Value = s.Size, Price = s.Price })
                 .ToListAsync();
 
             var fit = await db.fit
@@ -44,6 +44,7 @@ namespace GownApi.Services
                 Id = items.Id,
                 DegreeId = items.DegreeId,
                 DegreeName = items.DegreeName,
+                DegreeOrder = items.DegreeOrder,
                 Name = items.Name,
                 PictureBase64 = items.Picture != null ? Convert.ToBase64String(items.Picture) : null,
                 HirePrice = items.HirePrice,
