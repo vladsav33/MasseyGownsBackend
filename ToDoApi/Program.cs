@@ -1,14 +1,17 @@
 ﻿using GownApi;
-using Microsoft.EntityFrameworkCore;
 using GownApi.Endpoints;
+using GownApi.Model;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("GownDb");
 
-var key = Encoding.ASCII.GetBytes("SuperSecretKey123!"); // 🔑 Use a secure key in production
+var key = Encoding.ASCII.GetBytes("SuperSecretKey123!"); //  Use a secure key in production
 
 builder.Services.AddAuthentication(options =>
 {
@@ -28,31 +31,66 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-//Register the DbContext to use SQL Server (Azure SQL)
+// Register the DbContext to use PostgreSQL
 builder.Services.AddDbContext<GownDb>(options =>
     options
-           .UseNpgsql(connectionString)
-           .UseSnakeCaseNamingConvention());
+        .UseNpgsql(connectionString)
+        .UseSnakeCaseNamingConvention());
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-builder.Services.AddEndpointsApiExplorer(); // Required for minimal APIs
-builder.Services.AddSwaggerGen();           // Adds Swagger generation
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
 builder.Services.AddHttpClient();
 
+builder.Services.Configure<PaystationOptions>(
+    builder.Configuration.GetSection("Paystation"));
+
+// CORS for frontend
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173",
-                               "http://localhost:5174",                           
-                               "https://masseygowns-bzhkgzfubkavgchw.newzealandnorth-01.azurewebsites.net")  // allow frontend to prevent CORS errors
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
+            policy.WithOrigins(
+                    "http://localhost:5173",
+                    "http://localhost:5174",
+                    "https://masseygowns-bzhkgzfubkavgchw.newzealandnorth-01.azurewebsites.net"
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod();
         });
+});
+
+// BlobServiceClient registration
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+
+    // Preferred: use connection string (works both locally and in Azure if configured)
+    var blobConnectionString = config["BlobStorage:ConnectionString"];
+    if (!string.IsNullOrEmpty(blobConnectionString))
+    {
+        return new BlobServiceClient(blobConnectionString);
+    }
+
+    // Fallback: use account name + key (your original approach)
+    var accountName = config["StorageAccountName"];
+    var accountKey = config["StorageAccountKey"];
+
+    if (string.IsNullOrEmpty(accountName) || string.IsNullOrEmpty(accountKey))
+    {
+        throw new InvalidOperationException(
+            "Blob storage is not configured. Set 'BlobStorage:ConnectionString' or 'StorageAccountName' and 'StorageAccountKey'.");
+    }
+
+    var credential = new StorageSharedKeyCredential(accountName, accountKey);
+    var blobUri = new Uri($"https://{accountName}.blob.core.windows.net");
+
+    return new BlobServiceClient(blobUri, credential);
 });
 
 var app = builder.Build();
@@ -60,13 +98,10 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseCors("AllowFrontend");  // enable it
+app.UseCors("AllowFrontend");
 
-//if (app.Environment.IsDevelopment())
-//{
 app.UseSwagger();
 app.UseSwaggerUI();
-//}
 
 app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
@@ -76,13 +111,30 @@ app.MapFaqEndpoints();
 app.MapCeremonyEndoints();
 app.MapOrderEnpoints();
 app.MapItemsetsEndpoints();
-app.MapContactEndpoints();//Joe20250921
+app.MapContactEndpoints();
 app.MapDeliveryEndpoints();
 app.MapPaymentEndpoints();
 app.MapControllers();
 
+// Simple test endpoint for Blob connectivity
+app.MapGet("/test-blob", async (BlobServiceClient blobClient) =>
+{
+    try
+    {
+        var containers = blobClient.GetBlobContainersAsync();
+        var list = new List<string>();
 
-//app.MapGet("/todoitems/complete", async (GownDb db) =>
-//    await db.degree.Where(t => t.IsComplete).ToListAsync());
+        await foreach (var container in containers)
+        {
+            list.Add(container.Name);
+        }
+
+        return Results.Ok(list);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
 
 app.Run();
