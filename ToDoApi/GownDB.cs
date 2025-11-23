@@ -24,13 +24,13 @@ namespace GownApi
         public DbSet<HoodType> hoods => Set<HoodType>();
         public DbSet<ItemDegreeDto> ItemDegreeDtos { get; set; }  // optional
         public DbSet<ItemDegreeModel> itemDegreeModels { get; set; }
-        public DbSet<OrderedItems> orderedItems { get; set; } 
+        public DbSet<OrderedItems> orderedItems { get; set; }
         public DbSet<SelectedItemOut> selectedItemOut { get; set; }
-        public DbSet<Contacts> Contacts { get; set; } //Joe20250920
+        public DbSet<Contacts> Contacts { get; set; }
 
         public DbSet<Sku> Sku { get; set; }
 
-        public DbSet<HomePageSettings> HomePageSettings { get; set; } //Joe20251118
+        public DbSet<CmsContentBlock> CmsContentBlocks { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
