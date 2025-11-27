@@ -1,6 +1,7 @@
 ﻿using GownApi;
 using GownApi.Endpoints;
 using GownApi.Model;
+using GownApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -9,6 +10,14 @@ using Azure.Storage;
 using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Email settings
+var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>();
+builder.Services.AddSingleton(emailSettings);
+
+// Email service
+builder.Services.AddScoped<IEmailService, EmailService>();
+
 var connectionString = builder.Configuration.GetConnectionString("GownDb");
 
 var key = Encoding.ASCII.GetBytes("SuperSecretKey123!"); //  Use a secure key in production
@@ -113,6 +122,7 @@ app.MapContactEndpoints();
 app.MapDeliveryEndpoints();
 app.MapPaymentEndpoints();
 app.MapControllers();
+app.MapEmailEndpoints();
 
 // Simple test endpoint for Blob connectivity
 app.MapGet("/test-blob", async (BlobServiceClient blobClient) =>
