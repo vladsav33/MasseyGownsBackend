@@ -1,4 +1,5 @@
-﻿using GownApi.Model.Dto;
+﻿using GownApi.Model;
+using GownApi.Model.Dto;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -66,6 +67,38 @@ namespace GownApi.Endpoints
                 await db.SaveChangesAsync();
 
                 return Results.Ok(updatedItem);
+            });
+
+            app.MapPost("/admin/items", async (ItemDto itemDto, GownDb db) =>
+            {
+                var item = new Items
+                {
+                    Id = itemDto.Id,
+                    Name = itemDto.Name,
+                    Picture = string.IsNullOrEmpty(itemDto.PictureBase64) ? null : Convert.FromBase64String(itemDto.PictureBase64),
+                    HirePrice = itemDto.HirePrice,
+                    BuyPrice = itemDto.BuyPrice,
+                    Category = itemDto.Category,
+                    Description = itemDto.Description,
+                    IsHiring = itemDto.IsHiring
+                };
+
+                db.items.Add(item);
+                await db.SaveChangesAsync();
+
+                var responseDto = new ItemDto
+                {
+                    Id = item.Id,
+                    Name = item.Name,
+                    PictureBase64 = itemDto.PictureBase64,
+                    HirePrice = item.HirePrice,
+                    BuyPrice = item.BuyPrice,
+                    Category = item.Category,
+                    Description = item.Description,
+                    IsHiring = item.IsHiring
+                };
+
+                return Results.Created($"/items/{item.Id}", responseDto);
             });
         }
     }

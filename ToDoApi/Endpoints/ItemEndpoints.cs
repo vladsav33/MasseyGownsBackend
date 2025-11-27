@@ -50,26 +50,6 @@ namespace GownApi.Endpoints
                 return Results.Ok(itemsDtoList);
             });
 
-            app.MapPost("/items", async (ItemDto itemDto, GownDb db) =>
-            {
-                var item = new Items
-                {
-                    Id = itemDto.Id,
-                    Name = itemDto.Name,
-                    Picture = string.IsNullOrEmpty(itemDto.PictureBase64) ? null : Convert.FromBase64String(itemDto.PictureBase64),
-                    HirePrice = itemDto.HirePrice,
-                    BuyPrice = itemDto.BuyPrice,
-                    Category = itemDto.Category,
-                    Description = itemDto.Description,
-                    IsHiring = itemDto.IsHiring
-                };
-
-                db.items.Add(item);
-                await db.SaveChangesAsync();
-
-                return Results.Created($"/items/{item.Id}", item);
-            });
-
             app.MapGet("/itemsbydegree/{id}", async (int id, GownDb db) =>
             {
                 var results = await db.itemDegreeModels

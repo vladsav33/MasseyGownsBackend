@@ -105,6 +105,7 @@ app.UseSwaggerUI();
 
 app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
+app.AdminCeremonyEndpoints();
 app.MapDegreeEndpoints();
 app.MapItemEndpoints();
 app.MapFaqEndpoints();
