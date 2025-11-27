@@ -112,6 +112,9 @@ app.UseCors("AllowFrontend");
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.AdminItemsEndpoints();
+app.AdminDegreeEndpoints();
+app.AdminCeremonyEndpoints();
 app.MapDegreeEndpoints();
 app.MapItemEndpoints();
 app.MapFaqEndpoints();

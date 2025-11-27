@@ -5,6 +5,7 @@
         public int Id { get; set; }
         public int? DegreeId { get; set; }
         public string DegreeName { get; set; }
+        public int? DegreeOrder { get; set; }
         public string Name { get; set; }
         public string? PictureBase64 { get; set; }
         public float? HirePrice { get; set; }

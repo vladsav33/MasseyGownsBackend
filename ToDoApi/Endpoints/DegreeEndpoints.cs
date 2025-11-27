@@ -17,30 +17,6 @@ namespace GownApi.Endpoints
             app.MapGet("/degrees", async (GownDb db) =>
                 await db.degrees.ToListAsync());
 
-            app.MapPost("/degrees", async (Degrees degree, GownDb db) =>
-            {
-                db.degrees.Add(degree);
-                await db.SaveChangesAsync();
-
-                return Results.Created($"/degrees/{degree.Id}", degree);
-            });
-
-            app.MapPut("/degrees/{id}", async (int id, Degrees updatedDegree, GownDb db) =>
-            {
-                if (id != updatedDegree.Id)
-                    return Results.BadRequest("ID in URL and body must match");
-
-                var degree = await db.degrees.FindAsync(id);
-                if (degree is null)
-                    return Results.NotFound();
-
-                // Update fields
-                degree.Name = updatedDegree.Name;
-
-                await db.SaveChangesAsync();
-                return Results.Ok(degree);
-            });
-
             app.MapGet("/degreesbyceremony/{id}", async (int id, GownDb db) =>
             {
                 var results = await db.degreesCeremonies
