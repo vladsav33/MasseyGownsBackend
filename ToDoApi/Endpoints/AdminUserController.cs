@@ -1,4 +1,5 @@
 ﻿using GownApi.Model;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -14,6 +15,11 @@ namespace GownApi.Endpoints
 
             app.MapPost("/admin/users", async (User user, GownDb db) =>
             {
+
+                var hasher = new PasswordHasher<User>();
+                string hash = hasher.HashPassword(user, user.PasswordHash);
+
+                user.PasswordHash = hash;
                 db.users.Add(user);
                 await db.SaveChangesAsync();
 
