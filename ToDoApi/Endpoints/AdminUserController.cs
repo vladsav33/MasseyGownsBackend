@@ -95,6 +95,19 @@ namespace GownApi.Endpoints
 
                 return Results.Ok("Password updated.");
             });
+
+            app.MapDelete("/admin/users/{id}", async (int id, GownDb db) =>
+            {
+                var user = await db.users.FindAsync(id);
+
+                if (user == null)
+                    return Results.NotFound("User not found.");
+
+                db.users.Remove(user);
+                await db.SaveChangesAsync();
+
+                return Results.Ok($"User {id} deleted.");
+            });
         }
     }
     public class ChangePasswordRequest
