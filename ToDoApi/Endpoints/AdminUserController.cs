@@ -1,6 +1,9 @@
 ﻿using GownApi.Model;
+using GownApi.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using System;
 using System.Text.Json;
 
 namespace GownApi.Endpoints
@@ -21,8 +24,12 @@ namespace GownApi.Endpoints
 
                 user.PasswordHash = hash;
                 db.users.Add(user);
-                await db.SaveChangesAsync();
 
+                try {
+                    await db.SaveChangesAsync();
+                } catch(DbUpdateException ex) when (ex.InnerException is PostgresException pg) {
+                    return Results.BadRequest(PgError.Match(pg));
+                }
                 return Results.Created($"/admin/users/{user.Id}", user);
             });
 
@@ -52,7 +59,47 @@ namespace GownApi.Endpoints
 
                 return Results.Ok(user);
             });
+
+            app.MapPost("/api/auth/check-password", async (
+                CheckPasswordRequest request,
+                GownDb db) =>
+            {
+                var user = await db.users.SingleOrDefaultAsync(x => x.Name == request.Username);
+                if (user == null)
+                    return Results.NotFound("User not found");
+
+                var hasher = new PasswordHasher<User>();
+                var result = hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+
+                if (result == PasswordVerificationResult.Success)
+                    return Results.Ok(new { valid = true });
+
+                return Results.Ok(new { valid = false });
+            });
+
+            app.MapPut("/api/users/{id}/change-password", async (
+                int id,
+                ChangePasswordRequest req,
+                GownDb db ) => {
+                if (string.IsNullOrWhiteSpace(req.Password))
+                    return Results.BadRequest("Password is required.");
+
+                var user = await db.users.FindAsync(id);
+                if (user == null)
+                    return Results.NotFound("User not found.");
+
+                var hasher = new PasswordHasher<User>();
+                user.PasswordHash = hasher.HashPassword(user, req.Password);
+
+                await db.SaveChangesAsync();
+
+                return Results.Ok("Password updated.");
+            });
         }
+    }
+    public class ChangePasswordRequest
+    {
+        public string Password { get; set; }
     }
 }
 
