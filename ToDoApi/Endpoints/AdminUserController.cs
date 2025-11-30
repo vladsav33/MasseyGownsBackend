@@ -64,7 +64,7 @@ namespace GownApi.Endpoints
                 CheckPasswordRequest request,
                 GownDb db) =>
             {
-                var user = await db.users.SingleOrDefaultAsync(x => x.Name == request.Username);
+                var user = await db.users.SingleOrDefaultAsync(x => x.Name == request.Username && x.Active == true);
                 if (user == null)
                     return Results.NotFound("User not found");
 
