@@ -96,6 +96,24 @@ namespace GownApi.Endpoints
                 return Results.Ok("Password updated.");
             });
 
+            app.MapPut("/admin/users/{id}/active", async (
+                int id,
+                ChangeActive req,
+                GownDb db) => {
+                if (req.Active == null)
+                    return Results.BadRequest("Active flag is required.");
+
+                var user = await db.users.FindAsync(id);
+                if (user == null)
+                    return Results.NotFound("User not found.");
+
+                user.Active = req.Active;
+
+                await db.SaveChangesAsync();
+
+                return Results.Ok("Active status updated.");
+            });
+
             app.MapDelete("/admin/users/{id}", async (int id, GownDb db) =>
             {
                 var user = await db.users.FindAsync(id);
@@ -113,6 +131,11 @@ namespace GownApi.Endpoints
     public class ChangePasswordRequest
     {
         public string Password { get; set; }
+    }
+
+    public class ChangeActive
+    {
+        public bool? Active { get; set; }
     }
 }
 
