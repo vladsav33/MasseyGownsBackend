@@ -23,6 +23,7 @@ namespace GownApi.Services
             using var client = new SmtpClient(_settings.SmtpHost, _settings.SmtpPort)
             {
                 EnableSsl = _settings.EnableSsl,
+                UseDefaultCredentials = false,
                 Credentials = new NetworkCredential(_settings.UserName, _settings.Password)
             };
 
