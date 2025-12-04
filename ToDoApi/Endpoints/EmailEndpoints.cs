@@ -45,7 +45,7 @@ namespace GownApi.Endpoints
          {
              success = false,
              message = "Failed to send email.",
-             detail = ex.Message
+             detail = ex.ToString()
          },
          statusCode: StatusCodes.Status500InternalServerError
      );
