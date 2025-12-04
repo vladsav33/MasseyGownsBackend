@@ -12,6 +12,7 @@ namespace GownApi
         public DbSet<Items> items => Set<Items>();
         public DbSet<Ceremonies> ceremonies => Set<Ceremonies>();
         public DbSet<DegreesAndCeremonies> degreesCeremonies => Set<DegreesAndCeremonies>();
+        public DbSet<CeremonyDegree> ceremonyDegree => Set<CeremonyDegree>();
         public DbSet<Orders> orders => Set<Orders>();
         public DbSet<Faq> faq => Set<Faq>();
         public DbSet<Sizes> sizes => Set<Sizes>();

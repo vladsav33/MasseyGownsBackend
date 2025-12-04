@@ -20,11 +20,11 @@ namespace GownApi.Endpoints
             app.MapGet("/degreesbyceremony/{id}", async (int id, GownDb db) =>
             {
                 var results = await db.degreesCeremonies
-                    .FromSqlRaw(@"SELECT g.id, c.ceremony_date, c.name ceremony_name, d.name degree_name
+                    .FromSqlRaw(@"SELECT g.id, c.ceremony_date, c.name ceremony_name, d.id as degree_id, d.name degree_name, g.active
                             FROM public.ceremony_degree g
                             INNER JOIN public.ceremonies c ON c.id = g.graduation_id
                             INNER JOIN public.degrees d ON d.id = g.degree_id
-                            WHERE c.id = {0}", id)
+                            WHERE g.active AND c.id = {0}", id)
                     .ToListAsync();
 
                 return Results.Ok(results);
@@ -38,11 +38,11 @@ namespace GownApi.Endpoints
                 foreach (var result in results)
                 {
                     var degrees = await db.degreesCeremonies
-                        .FromSqlRaw(@"SELECT g.id, c.ceremony_date, c.name ceremony_name, d.name degree_name
+                        .FromSqlRaw(@"SELECT g.id, c.ceremony_date, c.name ceremony_name, d.id as degree_id, d.name degree_name, g.active
                             FROM public.ceremony_degree g
                             INNER JOIN public.ceremonies c ON c.id = g.graduation_id
                             INNER JOIN public.degrees d ON d.id = g.degree_id
-                            WHERE c.id = {0}", result.Id)
+                            WHERE g.active AND c.id = {0}", result.Id)
                         .ToListAsync();
                     var children = new List<MenuItem>();
                     foreach (var degree in degrees)
