@@ -25,7 +25,6 @@ namespace GownApi.Endpoints
                     });
                 }
 
-
                 try
                 {
                     await emailService.SendContactEmailAsync(request);

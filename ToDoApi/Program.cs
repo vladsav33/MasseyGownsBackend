@@ -1,6 +1,7 @@
 ﻿using GownApi;
 using GownApi.Endpoints;
 using GownApi.Model;
+using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -102,6 +103,9 @@ builder.Services.AddSingleton(sp =>
     return new BlobServiceClient(blobUri, credential);
 });
 
+builder.Services.Configure<SmtpSettings>(
+    builder.Configuration.GetSection("Smtp"));
+
 var app = builder.Build();
 
 app.UseAuthentication();
@@ -115,6 +119,7 @@ app.UseSwaggerUI();
 app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
 app.AdminCeremonyEndpoints();
+app.AdminUserEndpoints();
 app.MapDegreeEndpoints();
 app.MapItemEndpoints();
 app.MapFaqEndpoints();

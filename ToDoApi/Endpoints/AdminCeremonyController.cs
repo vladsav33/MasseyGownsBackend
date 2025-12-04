@@ -8,13 +8,19 @@ namespace GownApi.Endpoints
     {
         public static void AdminCeremonyEndpoints(this WebApplication app)
         {
-            app.MapPost("/admin/ceremonies", async (Ceremonies ceremony, GownDb db) =>
-            {
-                db.ceremonies.Add(ceremony);
-                await db.SaveChangesAsync();
 
-                return Results.Created($"/ceremonies/{ceremony.Id}", ceremony);
+            app.MapGet("/admin/ceremonies", async (GownDb db) => {
+                return await db.ceremonies.OrderBy(c => c.Name).ToListAsync();
+
             });
+
+            app.MapPost("/admin/ceremonies", async (Ceremonies ceremony, GownDb db) =>
+                {
+                    db.ceremonies.Add(ceremony);
+                    await db.SaveChangesAsync();
+
+                    return Results.Created($"/ceremonies/{ceremony.Id}", ceremony);
+                });
 
             app.MapPut("/admin/ceremonies/{id}", async (int id, Ceremonies updatedCeremony, GownDb db, ILogger<Program> logger) =>
             {
@@ -34,6 +40,7 @@ namespace GownApi.Endpoints
 
                 // Update fields
                 ceremony.Name = updatedCeremony.Name;
+                ceremony.CeremonyDate = updatedCeremony.CeremonyDate;
                 ceremony.DueDate = updatedCeremony.DueDate;
                 ceremony.Visible = updatedCeremony.Visible;
 
