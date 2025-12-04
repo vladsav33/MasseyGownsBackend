@@ -1,5 +1,6 @@
 ﻿using GownApi.Model;
 using GownApi.Model.Dto;
+using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -28,6 +29,27 @@ namespace GownApi.Endpoints
                 }).ToList();
 
                 return result;
+            });
+
+            app.MapGet("/admin/itemsbydegree/{id}", async (int id, GownDb db) => {
+                var results = await db.itemDegreeModels
+                .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, NULL as degree_name, NULL as degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                                FROM public.ceremony_degree_item cdi
+                                INNER JOIN public.items i on cdi.item_id = i.id
+					            INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id
+                                WHERE cdi.ceremony_degree_id = {0} ORDER BY i.category, i.name", id)
+                .ToListAsync();
+
+                var itemsDto = new List<ItemDegreeDto>();
+
+                foreach (var i in results)
+                {
+                    var itemDto = ItemMapper.ToDto(i);
+                    itemsDto.Add(itemDto);
+                }
+
+                var itemsDtoList = itemsDto.ToList();
+                return Results.Ok(itemsDtoList);
             });
 
             app.MapPut("/admin/items/{id}", async (int id, ItemDto updatedItem, GownDb db, ILogger<Program> logger) =>
