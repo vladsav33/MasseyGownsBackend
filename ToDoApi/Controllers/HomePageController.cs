@@ -8,6 +8,8 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Http;
 using System.IO;
+using System.Text.Json;
+
 
 namespace GownApi
 {
@@ -97,6 +99,13 @@ namespace GownApi
             public string Key { get; set; } = string.Empty;
 
             public IFormFile File { get; set; } = default!;
+        }
+
+        public class UpdateLinkDto 
+        {
+            public string Key { get; set; } = string.Empty;
+            public string Name { get; set; } = string.Empty;
+            public string Url { get; set; } = string.Empty;
         }
 
         // ================== Save text block ==================
@@ -205,6 +214,43 @@ namespace GownApi
                 url = newImageUrl,
                 block
             }, 200);
+        }
+
+        // ================== Save link block ==================
+
+        /// <summary>
+        /// Save a link content block.
+        /// POST /api/CmsContent/save-link
+        /// Body: { key, link }
+        /// </summary>
+        [HttpPost("save-link")]
+        public async Task<IActionResult> SaveLink([FromBody] UpdateLinkDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Key))
+            {
+                return ApiResponse(false, "Key is required.", statusCode: 400);
+            }
+
+            var block = await _db.CmsContentBlocks
+                .FirstOrDefaultAsync(b => b.Key == dto.Key && b.Type == "link");
+
+            if (block == null)
+            {
+                return ApiResponse(false, $"link block not found for key '{dto.Key}'.", statusCode: 404);
+            }
+
+            var payload = new
+            {
+                name = dto.Name ?? string.Empty,
+                url = dto.Url ?? string.Empty
+            };
+
+            block.Value = JsonSerializer.Serialize(payload);
+            block.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return ApiResponse(true, "Link updated successfully.", block, 200);
         }
 
     }
