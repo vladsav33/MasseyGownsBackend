@@ -4,8 +4,6 @@ namespace GownApi.Model
     public class Items : IItemBase
     {
         public int Id { get; set; }
-        //public int? DegreeId { get; set; }
-        //public string? DegreeName { get; set; }
         public string Name { get; set; }
         public byte[]? Picture { get; set; }
         public float? HirePrice { get; set; }
