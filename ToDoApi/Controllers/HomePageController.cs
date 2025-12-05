@@ -108,6 +108,13 @@ namespace GownApi
             public string Url { get; set; } = string.Empty;
         }
 
+        public class UpdateListDto
+        {
+            public string Key { get; set; } = string.Empty;
+            public string List { get; set; } = string.Empty;
+        }
+
+
         // ================== Save text block ==================
 
         /// <summary>
@@ -251,6 +258,36 @@ namespace GownApi
             await _db.SaveChangesAsync();
 
             return ApiResponse(true, "Link updated successfully.", block, 200);
+        }
+        // ================== Save list block ==================
+
+        /// <summary>
+        /// Save a list content block.
+        /// POST /api/CmsContent/save-list
+        /// Body: { key, list }
+        /// </summary>
+        [HttpPost("save-list")]
+        public async Task<IActionResult> SaveList([FromBody] UpdateListDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Key))
+            {
+                return ApiResponse(false, "Key is required.", statusCode: 400);
+            }
+
+            var block = await _db.CmsContentBlocks
+                .FirstOrDefaultAsync(b => b.Key == dto.Key && b.Type == "list");
+
+            if (block == null)
+            {
+                return ApiResponse(false, $"List block not found for key '{dto.Key}'.", statusCode: 404);
+            }
+
+            block.Value = dto.List ?? string.Empty;
+            block.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return ApiResponse(true, "List updated successfully.", block, 200);
         }
 
     }
