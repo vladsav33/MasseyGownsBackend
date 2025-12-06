@@ -114,6 +114,13 @@ namespace GownApi
             public string List { get; set; } = string.Empty;
         }
 
+        public class UploadFileForm
+        {
+            public string Key { get; set; } = string.Empty;
+            public IFormFile File { get; set; } = default!;
+        }
+
+
 
         // ================== Save text block ==================
 
@@ -290,5 +297,85 @@ namespace GownApi
             return ApiResponse(true, "List updated successfully.", block, 200);
         }
 
+        // ================== Upload File ==================
+
+        [HttpPost("upload-file")]
+        [RequestSizeLimit(20_000_000)] // 20MB
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadFile([FromForm] UploadFileForm form)
+        {
+            if (string.IsNullOrWhiteSpace(form.Key))
+            {
+                return ApiResponse(false, "Key is required.", statusCode: 400);
+            }
+
+            if (form.File == null || form.File.Length == 0)
+            {
+                return ApiResponse(false, "File is required.", statusCode: 400);
+            }
+
+            var block = await _db.CmsContentBlocks
+                .FirstOrDefaultAsync(b => b.Key == form.Key && b.Type == "file");
+
+            if (block == null)
+            {
+                return ApiResponse(false, $"File block not found for key '{form.Key}'.", statusCode: 404);
+            }
+
+            var containerClient = _blobServiceClient.GetBlobContainerClient("site-assets");
+            await containerClient.CreateIfNotExistsAsync();
+
+            // Create new blob name
+            var ext = Path.GetExtension(form.File.FileName);
+            var safeExt = string.IsNullOrWhiteSpace(ext) ? "" : ext.ToLowerInvariant();
+            var newBlobName = $"{form.Key}-{Guid.NewGuid()}{safeExt}";
+            var newBlobClient = containerClient.GetBlobClient(newBlobName);
+
+            var incomingContentType = string.IsNullOrWhiteSpace(form.File.ContentType)
+                ? "application/octet-stream"
+                : form.File.ContentType;
+
+            // upload new file
+            await using (var stream = form.File.OpenReadStream())
+            {
+                await newBlobClient.UploadAsync(stream, overwrite: true);
+
+                // set content-type
+                await newBlobClient.SetHttpHeadersAsync(new BlobHttpHeaders
+                {
+                    ContentType = incomingContentType
+                });
+            }
+
+            var newFileUrl = newBlobClient.Uri.ToString();
+
+            // ======== delete previous file ========
+            if (!string.IsNullOrEmpty(block.Value))
+            {
+                try
+                {
+                    var oldUri = new Uri(block.Value);
+                    var oldBlobName = Path.GetFileName(oldUri.AbsolutePath);
+                    var oldBlobClient = containerClient.GetBlobClient(oldBlobName);
+                    await oldBlobClient.DeleteIfExistsAsync();
+                }
+                catch
+                {
+
+                }
+            }
+
+            // update database
+            block.Value = newFileUrl;
+            block.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            return ApiResponse(true, "Image uploaded and URL updated successfully.", new
+            {
+                key = block.Key,
+                url = newFileUrl,
+                block
+            }, 200);
+        }
     }
 }
