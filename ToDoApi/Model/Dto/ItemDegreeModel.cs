@@ -15,5 +15,6 @@ namespace GownApi.Model.Dto
         public string? Category { get; set; }
         public string? Description { get; set; }
         public bool IsHiring { get; set; }
+        public bool Active { get; set; }
     }
 }

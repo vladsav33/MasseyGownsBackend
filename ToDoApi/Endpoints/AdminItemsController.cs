@@ -33,7 +33,7 @@ namespace GownApi.Endpoints
 
             app.MapGet("/admin/itemsbydegree/{id}", async (int id, GownDb db) => {
                 var results = await db.itemDegreeModels
-                .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, NULL as degree_name, NULL as degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, NULL as degree_name, NULL as degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, cdi.active
                                 FROM public.ceremony_degree_item cdi
                                 INNER JOIN public.items i on cdi.item_id = i.id
 					            INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id
@@ -122,6 +122,53 @@ namespace GownApi.Endpoints
 
                 return Results.Created($"/items/{item.Id}", responseDto);
             });
+
+            app.MapPost("/admin/degrees/{degreeId}/items",
+                async (int degreeId, List<ItemsUpdateDto> updates, GownDb db, ILogger<Program> logger) =>
+            {
+                logger.LogInformation(
+                    "Updating items for DegreeId={DegreeId}. Items count={Count}",
+                    degreeId,
+                    updates?.Count ?? 0
+                );
+
+                if (updates == null || updates.Count == 0)
+                {
+                    logger.LogWarning("No updates provided for DegreeId={DegreeId}", degreeId);
+                    return Results.BadRequest("No updates provided.");
+                }
+
+                foreach (var item in updates)
+                {
+                    string sql = @"
+                        UPDATE ceremony_degree_item 
+                        SET active = {2}
+                        WHERE id IN (
+                            SELECT cdi.id
+                            FROM ceremony_degree_item cdi
+                            INNER JOIN items i on cdi.item_id = i.id
+                            INNER JOIN ceremony_degree cd on cdi.ceremony_degree_id = cd.id
+                            WHERE cd.degree_id = {0} AND i.id = {1}
+                        );
+                    ";
+                    int rows = await db.Database.ExecuteSqlRawAsync(sql, degreeId, item.Id, item.Active);
+
+                    logger.LogInformation(
+                        "Updated {Rows} ceremony_degree_item rows for DegreeId={DegreeId}, ItemId={Item.Id}, Status={Active}",
+                        rows,
+                        degreeId,
+                        item.Id,
+                        item.Active
+                    );  
+                }    
+
+                return Results.Ok();
+            });
+        }
+        public class ItemsUpdateDto
+        {
+            public int Id { get; set; }
+            public bool Active { get; set; }
         }
     }
 }
