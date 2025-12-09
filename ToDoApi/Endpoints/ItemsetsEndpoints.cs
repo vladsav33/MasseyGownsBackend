@@ -10,7 +10,7 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/itemsets", async (GownDb db) => {
                 var results = await db.itemDegreeModels
-                .FromSqlRaw(@"SELECT i.id, NULL as degree_id, NULL as degree_name, NULL as degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                .FromSqlRaw(@"SELECT i.id, NULL as degree_id, NULL as degree_name, NULL as degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, True as active
                     FROM public.items i
                     WHERE category='Set'")
                 .ToListAsync();
