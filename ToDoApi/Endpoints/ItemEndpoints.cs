@@ -10,6 +10,7 @@ namespace GownApi.Endpoints
 {
     public static class ItemEndpoints
     {
+        const int CASUAL_HIRE_PHOTO = 2;
         public static void MapItemEndpoints(this WebApplication app)
         {
             app.MapGet("/items/{id}", async (int id, GownDb db) => {
@@ -35,7 +36,8 @@ namespace GownApi.Endpoints
                     FROM public.ceremony_degree g
                     INNER JOIN public.ceremony_degree_item cdi ON g.id = cdi.ceremony_degree_id
                     INNER JOIN public.items i ON cdi.item_id = i.id
-                    INNER JOIN public.degrees d ON g.degree_id = d.id")
+                    INNER JOIN public.degrees d ON g.degree_id = d.id
+                    WHERE g.graduation_id={0}", CASUAL_HIRE_PHOTO)
                 .ToListAsync();
 
                 var itemsDto = new List<ItemDto>();
