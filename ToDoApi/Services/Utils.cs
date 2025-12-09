@@ -34,7 +34,7 @@ namespace GownApi.Services
                 .ToListAsync();
 
             var hoods = await db.hoods
-                .FromSqlRaw("SELECT h.id, h.name FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
+                .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
                     items.Id)
                 .Select(h => new { h.Id, Value = h.Name })
                 .ToListAsync();
@@ -132,7 +132,7 @@ namespace GownApi.Services
                 .ToListAsync();
 
             var hoods = await db.hoods
-                .FromSqlRaw("SELECT h.id, h.name FROM items i INNER JOIN hood_type h ON h.item_id = i.id WHERE h.item_id = {0}",
+                .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM items i INNER JOIN hood_type h ON h.item_id = i.id WHERE h.item_id = {0}",
                     items.Id)
                 .Select(h => new { h.Id, Value = h.Name })
                 .ToListAsync();

@@ -14,7 +14,7 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/items/{id}", async (int id, GownDb db) => {
                 var results = await db.Database.SqlQueryRaw<ItemDegreeModel>(@"
-                    SELECT DISTINCT i.id, cd.degree_id, d.name as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                    SELECT DISTINCT i.id, cd.degree_id, d.name as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, cdi.active
                     FROM public.items i
                     INNER JOIN public.ceremony_degree_item cdi ON i.id = cdi.item_id
                     INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id
@@ -31,7 +31,7 @@ namespace GownApi.Endpoints
                 //.FromSqlRaw(@"SELECT i.id, NULL as degree_id, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
                 //    FROM public.items i")
                 //.ToListAsync();
-                .FromSqlRaw(@"SELECT DISTINCT i.id, g.degree_id, d.name as degree_name, d.degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                .FromSqlRaw(@"SELECT DISTINCT i.id, g.degree_id, d.name as degree_name, d.degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, cdi.active
                     FROM public.ceremony_degree g
                     INNER JOIN public.ceremony_degree_item cdi ON g.id = cdi.ceremony_degree_id
                     INNER JOIN public.items i ON cdi.item_id = i.id
@@ -50,10 +50,22 @@ namespace GownApi.Endpoints
                 return Results.Ok(itemsDtoList);
             });
 
+            app.MapGet("/itemsonly", async (GownDb db) => {
+                return await db.items.ToListAsync();
+            });
+
+            app.MapGet("/sizesonly", async (GownDb db) => {
+                return await db.sizes.ToListAsync();
+            });
+
+            app.MapGet("/hoodsonly", async (GownDb db) => {
+                return await db.hood_type.ToListAsync();
+            });
+
             app.MapGet("/itemsbydegree/{id}", async (int id, GownDb db) =>
             {
                 var results = await db.itemDegreeModels
-                    .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, NULL as degree_name, NULL as degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
+                    .FromSqlRaw(@"SELECT i.id, cd.degree_id as degree_id, NULL as degree_name, NULL as degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, cdi.active
                     FROM public.ceremony_degree_item cdi
                     INNER JOIN public.items i on cdi.item_id = i.id
 					INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id

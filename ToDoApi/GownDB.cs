@@ -19,6 +19,7 @@ namespace GownApi
         public DbSet<Sizes> sizes => Set<Sizes>();
         public DbSet<Fit> fit => Set<Fit>();
         public DbSet<HoodType> hoods => Set<HoodType>();
+        public DbSet<HoodType> hood_type => Set<HoodType>();
         public DbSet<ItemDegreeDto> ItemDegreeDtos { get; set; }  // optional
         public DbSet<ItemDegreeModel> itemDegreeModels { get; set; }
         public DbSet<OrderedItems> orderedItems { get; set; }
