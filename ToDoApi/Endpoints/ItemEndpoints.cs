@@ -29,15 +29,12 @@ namespace GownApi.Endpoints
 
             app.MapGet("/items", async (GownDb db) => {
                 var results = await db.Set<ItemDegreeModel>()
-                //.FromSqlRaw(@"SELECT i.id, NULL as degree_id, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring
-                //    FROM public.items i")
-                //.ToListAsync();
                 .FromSqlRaw(@"SELECT DISTINCT i.id, g.degree_id, d.name as degree_name, d.degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, cdi.active
                     FROM public.ceremony_degree g
                     INNER JOIN public.ceremony_degree_item cdi ON g.id = cdi.ceremony_degree_id
                     INNER JOIN public.items i ON cdi.item_id = i.id
                     INNER JOIN public.degrees d ON g.degree_id = d.id
-                    WHERE g.graduation_id={0}", CASUAL_HIRE_PHOTO)
+                    WHERE cdi.active AND g.graduation_id={0}", CASUAL_HIRE_PHOTO)
                 .ToListAsync();
 
                 var itemsDto = new List<ItemDto>();
@@ -51,7 +48,6 @@ namespace GownApi.Endpoints
                 var itemsDtoList = itemsDto.ToList();
                 return Results.Ok(itemsDtoList);
             });
-
             app.MapGet("/itemsonly", async (GownDb db) => {
                 return await db.items.ToListAsync();
             });
