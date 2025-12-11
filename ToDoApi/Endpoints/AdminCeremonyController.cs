@@ -1,9 +1,11 @@
-﻿using GownApi.Model;
+﻿using AutoMapper;
+using GownApi.Model;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace GownApi.Endpoints
 {
+
     public static class AdminCeremonyController
     {
         public static void AdminCeremonyEndpoints(this WebApplication app)
@@ -38,11 +40,35 @@ namespace GownApi.Endpoints
                 if (ceremony is null)
                     return Results.NotFound();
 
-                // Update fields
-                ceremony.Name = updatedCeremony.Name;
-                ceremony.CeremonyDate = updatedCeremony.CeremonyDate;
-                ceremony.DueDate = updatedCeremony.DueDate;
-                ceremony.Visible = updatedCeremony.Visible;
+                var configExpression = new MapperConfigurationExpression();
+                configExpression.CreateMap<Ceremonies, Ceremonies>()
+                    .ForAllMembers(opt => opt.Condition((src, dest, srcMember) => srcMember != null));
+
+                var config = new MapperConfiguration(configExpression);
+                IMapper mapper = config.CreateMapper();
+                mapper.Map(updatedCeremony, ceremony);
+
+
+                //// Update fields
+                //ceremony.Name = updatedCeremony.Name;
+                //ceremony.CeremonyDate = updatedCeremony.CeremonyDate;
+                //ceremony.DueDate = updatedCeremony.DueDate;
+                //ceremony.Visible = updatedCeremony.Visible;
+                //ceremony.IdCode = updatedCeremony.IdCode;
+                //ceremony.InstitutionName = updatedCeremony.InstitutionName;
+                //ceremony.City = updatedCeremony.City;
+                //ceremony.CourierAddress = updatedCeremony.CourierAddress;
+                //ceremony.PostalAddress = updatedCeremony.PostalAddress;
+                //ceremony.DespatchDate = updatedCeremony.DespatchDate;
+                //ceremony.DateSent = updatedCeremony.DateSent;
+                //ceremony.ReturnDate = updatedCeremony.ReturnDate;
+                //ceremony.DateReturned = updatedCeremony.DateReturned;
+                //ceremony.Organiser = updatedCeremony.Organiser;
+                //ceremony.Phone = updatedCeremony.Phone;
+                //ceremony.Email = updatedCeremony.Email;
+                //ceremony.InvoiceEmail = updatedCeremony.InvoiceEmail;
+                //ceremony.PriceCode = updatedCeremony.PriceCode;
+                //ceremony.Freight = updatedCeremony.Freight;
 
                 await db.SaveChangesAsync();
 
