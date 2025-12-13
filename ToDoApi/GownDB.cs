@@ -26,6 +26,8 @@ namespace GownApi
         public DbSet<User> users { get; set; }
         public DbSet<Sku> Sku { get; set; }
         public DbSet<CmsContentBlock> CmsContentBlocks { get; set; }
+        public DbSet<EmailTemplate> EmailTemplates { get; set; } 
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
