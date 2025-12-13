@@ -1,14 +1,15 @@
-﻿using GownApi;
+﻿using Azure.Storage;
+using Azure.Storage.Blobs;
+using GownApi;
 using GownApi.Endpoints;
 using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Azure.Storage;
-using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 

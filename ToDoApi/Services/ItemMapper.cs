@@ -18,7 +18,8 @@ public static class ItemMapper
             BuyPrice = item.BuyPrice,
             Category = item.Category,
             Description = item.Description,
-            IsHiring = item.IsHiring
+            IsHiring = item.IsHiring,
+            Active = item.Active
         };
     }
     public static List<ItemDegreeDto> ToDtoList(IEnumerable<ItemDegreeModel> items)

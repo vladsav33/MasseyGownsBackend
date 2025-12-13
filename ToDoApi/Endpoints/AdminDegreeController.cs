@@ -12,15 +12,24 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/admin/degreesbyceremony/{id}", async (int id, GownDb db) =>
             {
-                var results = await db.degreesCeremonies
-                    .FromSqlRaw(@"SELECT g.id, c.ceremony_date, c.name ceremony_name, d.id as degree_id, d.name degree_name, g.active
-                            FROM public.ceremony_degree g
-                            INNER JOIN public.ceremonies c ON c.id = g.graduation_id
-                            INNER JOIN public.degrees d ON d.id = g.degree_id
-                            WHERE c.id = {0} ORDER BY d.degree_order", id)
-                    .ToListAsync();
+                if (id != 0) {
+                    var results = await db.degreesCeremonies
+                        .FromSqlRaw(@"SELECT g.id, c.ceremony_date, c.name ceremony_name, d.id as degree_id, d.name degree_name, g.active
+                                FROM public.ceremony_degree g
+                                INNER JOIN public.ceremonies c ON c.id = g.graduation_id
+                                INNER JOIN public.degrees d ON d.id = g.degree_id
+                                WHERE c.id = {0} ORDER BY d.degree_order", id)
+                        .ToListAsync();
 
-                return Results.Ok(results);
+                    return Results.Ok(results);
+                } else {
+                    var results = await db.degreesCeremonies
+                        .FromSqlRaw(@"SELECT d.id, NULL as ceremony_date, '' as ceremony_name, d.id as degree_id, d.name degree_name, TRUE as active
+                                FROM public.degrees d")
+                        .ToListAsync();
+
+                    return Results.Ok(results);
+                }
             });
 
             app.MapPost("/admin/degrees", async (Degrees degree, GownDb db) =>
