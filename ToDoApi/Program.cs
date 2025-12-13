@@ -117,6 +117,7 @@ app.UseCors("AllowFrontend");
 app.UseSwagger();
 app.UseSwaggerUI();
 
+//app.AdminBulkOrderEndpoint(); 
 app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
 app.AdminCeremonyEndpoints();
@@ -132,6 +133,7 @@ app.MapDeliveryEndpoints();
 app.MapPaymentEndpoints();
 app.MapControllers();
 app.MapEmailEndpoints();
+
 
 // Simple test endpoint for Blob connectivity
 app.MapGet("/test-blob", async (BlobServiceClient blobClient) =>
