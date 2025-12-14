@@ -117,7 +117,7 @@ app.UseCors("AllowFrontend");
 app.UseSwagger();
 app.UseSwaggerUI();
 
-//app.AdminBulkOrderEndpoint(); 
+app.AdminBulkOrderEndpoints(); 
 app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
 app.AdminCeremonyEndpoints();
