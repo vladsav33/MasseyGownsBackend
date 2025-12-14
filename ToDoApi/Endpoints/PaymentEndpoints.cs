@@ -10,15 +10,16 @@ using GownApi;
 using GownApi.Model;
 using System.Globalization;
 
+
 namespace GownApi.Endpoints
 {
     public static class PaymentEndpoints
     {
-        // Config (in production → move to appsettings.json)
+        // In production move these to appsettings
         const string PaystationInitiationUrl = "https://www.paystation.co.nz/direct/paystation.dll";
         const string MerchantId = "617970";
         const string GatewayId = "DEVELOPMENT";
-        const string ReturnUrl = "https://yourdomain.com/checkout"; // React route
+        const string ReturnUrl = "https://yourdomain.com/checkout";
 
         record PaymentRequest(int Amount, string OrderId);
 
@@ -56,7 +57,7 @@ namespace GownApi.Endpoints
             // ---------------- Paystation server-to-server notify ----------------
             app.MapPost("/notify", async (HttpRequest req, IConfiguration config, GownDb db) =>
             {
-                // Read raw body so we can log and parse XML
+                // Log raw body
                 req.EnableBuffering();
                 using var reader = new StreamReader(req.Body, Encoding.UTF8, leaveOpen: true);
                 var raw = await reader.ReadToEndAsync();
@@ -83,7 +84,7 @@ namespace GownApi.Endpoints
                 var merchantSession = Get("MerchantSession");
                 var txnTime = Get("TransactionTime") ?? Get("DigitalReceiptTime");
                 var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var cents) ? cents : 0;
-                var purchaseAmount = purchaseAmountCents / 100m; // Amount Paid from Paystation
+                var purchaseAmount = purchaseAmountCents / 100m;
 
                 if (ec != 0)
                 {
@@ -93,7 +94,7 @@ namespace GownApi.Endpoints
 
                 Console.WriteLine($"Paystation SUCCESS: txn={txnId}, amount={purchaseAmount}, ms={merchantSession}");
 
-                // For now: use the most recent order
+                // Use the latest order for now
                 var order = await db.orders
                     .OrderByDescending(o => o.Id)
                     .FirstOrDefaultAsync();
@@ -104,12 +105,11 @@ namespace GownApi.Endpoints
                     return Results.Ok("NO_ORDER");
                 }
 
-                // Load ordered items for this order
+                // Load ordered items
                 var orderedItems = await db.orderedItems
                     .Where(oi => oi.OrderId == order.Id)
                     .ToListAsync();
 
-                // Join with Sku + Items to get item names
                 var skuIds = orderedItems.Select(oi => oi.SkuId).Distinct().ToList();
                 var skuList = await db.Sku
                     .Where(s => skuIds.Contains(s.Id))
@@ -120,7 +120,21 @@ namespace GownApi.Endpoints
                     .Where(i => itemIds.Contains(i.Id))
                     .ToListAsync();
 
-                // Calculate totals (Grand Total / Amount Paid / Balance Owing)
+                // Event title from ceremonies table
+                string eventTitle = "Graduation Event";
+                if (order.CeremonyId.HasValue)
+                {
+                    var ceremony = await db.ceremonies
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(c => c.Id == order.CeremonyId.Value);
+
+                    if (ceremony != null && !string.IsNullOrWhiteSpace(ceremony.Name))
+                    {
+                        eventTitle = ceremony.Name;
+                    }
+                }
+
+                // Totals
                 decimal total = 0m;
 
                 var sbRows = new StringBuilder();
@@ -129,26 +143,45 @@ namespace GownApi.Endpoints
                     var sku = skuList.FirstOrDefault(s => s.Id == oi.SkuId);
                     var item = sku != null ? items.FirstOrDefault(i => i.Id == sku.ItemId) : null;
 
-                    var itemName = item?.Name ?? $"Item {oi.SkuId}";
+                    var itemName = (item != null ? item.Name : $"Item {oi.SkuId}");
                     int qty = oi.Quantity;
-                    decimal price = (decimal)oi.Cost;
-                    decimal lineTotal = price * qty;
-                    decimal gst = price * 0.15m; // GST per item = price * 15%
+                    decimal price = (decimal)oi.Cost;                    
+                    decimal lineGst = Math.Round(price * 0.15m * qty, 2);
+                    decimal lineTotal = price * qty;                    
 
                     total += lineTotal;
 
                     sbRows.AppendLine($@"
 <tr>
-  <td>{WebUtility.HtmlEncode(itemName)}</td>
-  <td>{qty}</td>
-  <td>{price:0.00}</td>
-  <td>{gst:0.00}</td>
-  <td>{lineTotal:0.00}</td>
+  <td align=""left""  style=""padding:8px 10px;"">
+    {WebUtility.HtmlEncode(itemName)}
+  </td>
+  <td align=""center"" style=""padding:8px 10px; text-align:center;"">
+    {qty}
+  </td>
+  <td align=""right"" style=""padding:8px 10px; text-align:right;"">
+    {price:0.00}
+  </td>
+  <td align=""right"" style=""padding:8px 10px; text-align:right;"">
+    {lineGst:0.00}
+  </td>
+  <td align=""right"" style=""padding:8px 10px; text-align:right;"">
+    {lineTotal:0.00}
+  </td>
 </tr>");
+
                 }
 
-                decimal amountPaid = purchaseAmount;           // From Paystation
-                decimal balanceOwing = total - amountPaid;     // Grand Total - Amount Paid
+                // Use Paystation amount as AmountPaid
+                var amountPaid = purchaseAmount;
+                if (amountPaid == 0m)
+                {
+                    // Fallback if Paystation amount is missing
+                    amountPaid = total;
+                }
+
+                var balanceOwing = total - amountPaid;
+                if (balanceOwing < 0) balanceOwing = 0m;
 
                 var cartRowsHtml = sbRows.ToString();
 
@@ -163,14 +196,17 @@ namespace GownApi.Endpoints
 
                 if (template != null)
                 {
-                    var invoiceDate = order.OrderDate
-                    .ToDateTime(TimeOnly.MinValue)
-                    .ToString("dd MMM yyyy", CultureInfo.CreateSpecificCulture("en-NZ"));
+                    var invoiceDate =
+    order.OrderDate
+         .ToDateTime(TimeOnly.MinValue)
+         .ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+
 
                     var values = new Dictionary<string, string?>
                     {
                         ["TransactionId"] = txnId ?? "",
-                        ["GstNumber"] = "", // can come from config later
+                        ["EventTitle"] = eventTitle,
+                        ["GstNumber"] = "", // later you can move GST number to config
                         ["InvoiceNumber"] = order.Id.ToString(),
                         ["InvoiceDate"] = invoiceDate,
                         ["FirstName"] = order.FirstName,
@@ -213,24 +249,21 @@ namespace GownApi.Endpoints
 <ul>
   <li><b>Result</b>: {WebUtility.HtmlEncode(msg ?? "")}</li>
   <li><b>Transaction ID</b>: {WebUtility.HtmlEncode(txnId ?? "")}</li>
-  <li><b>Amount (Paystation)</b>: {purchaseAmount:0.00}</li>
-  <li><b>Grand Total</b>: {total:0.00}</li>
-  <li><b>Balance Owing</b>: {balanceOwing:0.00}</li>
+  <li><b>Amount</b>: {purchaseAmount:0.00}</li>
   <li><b>MerchantSession</b>: {WebUtility.HtmlEncode(merchantSession ?? "")}</li>
   <li><b>Time</b>: {WebUtility.HtmlEncode(txnTime ?? "")}</li>
 </ul>";
                 }
 
-                // SMTP configuration (Mailtrap etc.)
+                // SMTP configuration
                 var smtpHost = config["Smtp:Host"];
                 var smtpPort = int.TryParse(config["Smtp:Port"], out var p) ? p : 587;
                 var smtpUser = config["Smtp:Username"];
                 var smtpPass = config["Smtp:Password"];
 
                 var fromAddress = config["Email:From"] ?? smtpUser;
-
-                // For now still send to test inbox; later you can switch to order.Email
                 var toAddress = config["Email:To"] ?? smtpUser;
+                // When ready for production you can switch to:
                 // var toAddress = order.Email;
 
                 using var client = new SmtpClient(smtpHost!, smtpPort)
@@ -254,7 +287,6 @@ namespace GownApi.Endpoints
         }
 
         // Simple {{Key}} template replacement
-        // Simple {{Key}} template replacement – supports {{Key}}, {{ Key }}, etc.
         private static string ApplyTemplate(string template, IDictionary<string, string?> values)
         {
             if (string.IsNullOrEmpty(template))
@@ -264,25 +296,13 @@ namespace GownApi.Endpoints
 
             foreach (var kv in values)
             {
+                var key = "{{" + kv.Key + "}}";
                 var value = kv.Value ?? string.Empty;
-
-                var patterns = new[]
-                {
-            "{{" + kv.Key + "}}",
-            "{{ " + kv.Key + " }}",
-            "{{" + kv.Key + " }}",
-            "{{ " + kv.Key + "}}"
-        };
-
-                foreach (var pattern in patterns)
-                {
-                    result = result.Replace(pattern, value);
-                }
+                result = result.Replace(key, value);
             }
 
             return result;
         }
-
 
         // Extract DigitalOrder redirect URL from Paystation XML
         private static string ExtractRedirectUrl(string xml)
