@@ -23,6 +23,7 @@ namespace GownApi
         public DbSet<ItemDegreeDto> ItemDegreeDtos { get; set; }  // optional
         public DbSet<ItemDegreeModel> itemDegreeModels { get; set; }
         public DbSet<OrderedItems> orderedItems { get; set; }
+        public DbSet<BulkOrder> bulkOrders { get; set; }
         public DbSet<SelectedItemOut> selectedItemOut { get; set; }
         public DbSet<Contacts> Contacts { get; set; }
         public DbSet<User> users { get; set; }

@@ -143,6 +143,38 @@ namespace GownApi
             return ApiResponse(true, "Text updated successfully.", block, 200);
         }
 
+        // ================== Save text block ==================
+
+        /// <summary>
+        /// Get a text content block.
+        /// GET /api/CmsContent/get-text?key=home.hero.title
+        /// </summary>
+        [HttpGet("get-text")]
+        public async Task<IActionResult> GetText([FromQuery] string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return ApiResponse(false, "Key is required.", statusCode: 400);
+            }
+
+            var block = await _db.CmsContentBlocks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Key == key && b.Type == "text");
+
+            if (block == null)
+            {
+                return ApiResponse(false, $"Text block not found for key '{key}'.", statusCode: 404);
+            }
+
+            return ApiResponse(true, "Text retrieved successfully.", new
+            {
+                key = block.Key,
+                text = block.Value,
+                updatedAt = block.UpdatedAt
+            }, 200);
+        }
+
+
         // ================== Upload Image ==================
 
         [HttpPost("upload-image")]

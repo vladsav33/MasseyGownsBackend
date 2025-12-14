@@ -22,5 +22,6 @@
         public string? InvoiceEmail { get; set; }
         public string? PriceCode { get; set; }
         public float? Freight { get; set; }
+        public string? CollectionTime { get; set; }
     }
 }
