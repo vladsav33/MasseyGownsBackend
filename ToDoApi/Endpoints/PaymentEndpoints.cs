@@ -1,15 +1,15 @@
-﻿using GownApi.Services;
+﻿using GownApi;
+using GownApi.Model;
+using GownApi.Model.Dto;
+using GownApi.Services;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Xml.Linq;
+using System.Globalization;
 using System.Net;
 using System.Net.Mail;
 using System.Text;
-using GownApi;
-using GownApi.Model;
-using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace GownApi.Endpoints
 {
@@ -23,10 +23,9 @@ namespace GownApi.Endpoints
 
         public static void MapPaymentEndpoints(this WebApplication app)
         {
-            // ---------------- create payment ----------------
             app.MapPost("/api/payment/create-payment", async (
                 PaymentRequest request,
-                [FromServices] IHttpClientFactory httpClientFactory) =>
+                IHttpClientFactory httpClientFactory) =>
             {
                 var httpClient = httpClientFactory.CreateClient();
                 var values = new Dictionary<string, string>
@@ -48,47 +47,124 @@ namespace GownApi.Endpoints
                 return Results.Ok(new { redirectUrl = ExtractRedirectUrl(responseString) });
             });
 
-            // ---------------- Paystation notify ----------------
             app.MapPost("/notify", async (HttpRequest req, IConfiguration config, GownDb db) =>
             {
                 req.EnableBuffering();
-                using var reader = new StreamReader(req.Body, Encoding.UTF8, leaveOpen: true);
-                var raw = await reader.ReadToEndAsync();
-                req.Body.Position = 0;
 
-                var doc = XDocument.Parse(raw);
+                string raw;
+                using (var reader = new StreamReader(req.Body, Encoding.UTF8, leaveOpen: true))
+                {
+                    raw = await reader.ReadToEndAsync();
+                    req.Body.Position = 0;
+                }
+
+                Console.WriteLine("=================================================");
+                Console.WriteLine("Paystation notify received");
+                Console.WriteLine($"Time (UTC): {DateTime.UtcNow:O}");
+                Console.WriteLine($"Remote IP: {req.HttpContext.Connection.RemoteIpAddress}");
+                Console.WriteLine($"Content-Type: {req.ContentType}");
+                Console.WriteLine("-------------------------------------------------");
+                Console.WriteLine("Headers:");
+                foreach (var h in req.Headers)
+                {
+                    Console.WriteLine($"{h.Key}: {h.Value}");
+                }
+                Console.WriteLine("-------------------------------------------------");
+                Console.WriteLine("Raw XML:");
+                Console.WriteLine(raw);
+                Console.WriteLine("-------------------------------------------------");
+
+                XDocument doc;
+                try
+                {
+                    doc = XDocument.Parse(raw);
+                }
+                catch
+                {
+                    Console.WriteLine("Invalid XML");
+                    return Results.Ok("INVALID_XML");
+                }
+
                 string? Get(string n) => doc.Root?.Element(n)?.Value;
 
                 int ec = int.TryParse(Get("ec"), out var ecVal) ? ecVal : -1;
-                if (ec != 0) return Results.Ok("IGNORED");
+                var em = Get("em");
+                var txnId = Get("PaystationTransactionID")
+                            ?? Get("TransactionID")
+                            ?? Get("ti");
+                var merchantSession = Get("MerchantSession");
+                var txnTime = Get("TransactionTime") ?? Get("DigitalReceiptTime");
+                var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var c) ? c : 0;
+                var purchaseAmount = purchaseAmountCents / 100m;
+                var receiptNumber = Get("ReturnReceiptNumber");
 
-                var txnId = Get("PaystationTransactionID") ?? Get("TransactionID") ?? Get("ti");
-                var purchaseAmount = (int.TryParse(Get("PurchaseAmount"), out var c) ? c : 0) / 100m;
+                Console.WriteLine("Parsed fields:");
+                Console.WriteLine($"ec: {ec}");
+                Console.WriteLine($"em: {em}");
+                Console.WriteLine($"txnId: {txnId}");
+                Console.WriteLine($"merchantSession: {merchantSession}");
+                Console.WriteLine($"txnTime: {txnTime}");
+                Console.WriteLine($"purchaseAmount: {purchaseAmount:0.00}");
+                Console.WriteLine($"ReturnReceiptNumber: {receiptNumber}");
+                Console.WriteLine("=================================================");
 
-                var order = await db.orders.OrderByDescending(o => o.Id).FirstOrDefaultAsync();
-                if (order == null) return Results.Ok("NO_ORDER");
-                string eventTitle = "Graduation Event";
+                if (ec != 0)
+                {
+                    return Results.Ok("IGNORED");
+                }
+
+                var order = await db.orders
+                    .OrderByDescending(o => o.Id)
+                    .FirstOrDefaultAsync();
+
+                if (order == null)
+                {
+                    return Results.Ok("NO_ORDER");
+                }
+
+                var OrderNumber = !string.IsNullOrWhiteSpace(receiptNumber)
+                    ? $"ORD{receiptNumber}"
+                    : $"ORD{order.Id}";
+
+                string eventTitle = "";
+                string ceremonyDate = "";
+                string collectionTime = "";
 
                 if (order.CeremonyId.HasValue)
                 {
                     var ceremony = await db.ceremonies
                         .AsNoTracking()
-                        .FirstOrDefaultAsync(c => c.Id == order.CeremonyId.Value);
+                        .FirstOrDefaultAsync(ca => ca.Id == order.CeremonyId.Value);
 
-                    if (ceremony != null && !string.IsNullOrWhiteSpace(ceremony.Name))
+                    if (ceremony != null)
                     {
-                        eventTitle = ceremony.Name;
+                        if (!string.IsNullOrWhiteSpace(ceremony.Name))
+                        {
+                            eventTitle = ceremony.Name;
+                        }
+
+                        if (ceremony.CeremonyDate != null)
+                        {
+                            ceremonyDate = ceremony.CeremonyDate.Value
+                                .ToString("dd MMMM yyyy", CultureInfo.InvariantCulture);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(ceremony.CollectionTime))
+                        {
+                            collectionTime = ceremony.CollectionTime.Trim();
+                        }
                     }
                 }
 
+                var orderedItems = await db.orderedItems
+                    .Where(o => o.OrderId == order.Id)
+                    .ToListAsync();
 
-                var orderedItems = await db.orderedItems.Where(o => o.OrderId == order.Id).ToListAsync();
                 var skuIds = orderedItems.Select(o => o.SkuId).Distinct().ToList();
                 var skus = await db.Sku.Where(s => skuIds.Contains(s.Id)).ToListAsync();
                 var itemIds = skus.Select(s => s.ItemId).Distinct().ToList();
                 var items = await db.items.Where(i => itemIds.Contains(i.Id)).ToListAsync();
 
-                // -------- build cart rows --------
                 decimal total = 0m;
                 var sbRows = new StringBuilder();
 
@@ -122,16 +198,19 @@ namespace GownApi.Endpoints
                     .AsNoTracking()
                     .SingleOrDefaultAsync(t => t.Name == "PaymentCompleted");
 
-                if (template == null) return Results.Ok("NO_TEMPLATE");
+                if (template == null)
+                {
+                    return Results.Ok("NO_TEMPLATE");
+                }
 
-                var invoiceDate = order.OrderDate
+                var OrderDate = order.OrderDate
                     .ToDateTime(TimeOnly.MinValue)
                     .ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
 
                 var values = new Dictionary<string, string?>
                 {
-                    ["InvoiceNumber"] = order.Id.ToString(),
-                    ["InvoiceDate"] = invoiceDate,
+                    ["OrderNumber"] = OrderNumber,
+                    ["OrderDate"] = OrderDate,
                     ["FirstName"] = order.FirstName ?? "",
                     ["LastName"] = order.LastName ?? "",
                     ["Address"] = order.Address ?? "",
@@ -144,14 +223,16 @@ namespace GownApi.Endpoints
                     ["AmountPaid"] = amountPaid.ToString("0.00"),
                     ["BalanceOwing"] = balance.ToString("0.00"),
                     ["EventTitle"] = eventTitle,
-
+                    ["CeremonyDate"] = ceremonyDate
                 };
 
                 var subject = ApplyTemplate(template.SubjectTemplate, values);
                 var bodyTop = ApplyTemplate(template.BodyHtml, values);
 
-                // ⬇⬇⬇ 核心：注入 cart rows（唯一来源）⬇⬇⬇
                 var receiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
+
+                receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
+
                 receiptHtml = InjectCartRowsIntoCartTable(receiptHtml, sbRows.ToString());
 
                 var receiptInner = ExtractBodyInnerHtml(receiptHtml);
@@ -168,20 +249,17 @@ namespace GownApi.Endpoints
 
                 using var client = new SmtpClient(
                     config["Smtp:Host"]!,
-                    int.Parse(config["Smtp:Port"] ?? "587")
-                )
+                    int.Parse(config["Smtp:Port"] ?? "587"))
                 {
                     EnableSsl = true,
                     Credentials = new NetworkCredential(
                         config["Smtp:Username"],
-                        config["Smtp:Password"]
-                    )
+                        config["Smtp:Password"])
                 };
 
                 var mail = new MailMessage(
                     config["Email:From"]!,
-                    config["Email:To"]!
-                )
+                    config["Email:To"]!)
                 {
                     Subject = subject,
                     Body = finalBody,
@@ -193,8 +271,6 @@ namespace GownApi.Endpoints
             });
         }
 
-        // ---------------- helpers ----------------
-
         private static string ApplyTemplate(string template, IDictionary<string, string?> values)
         {
             if (string.IsNullOrEmpty(template)) return "";
@@ -204,13 +280,11 @@ namespace GownApi.Endpoints
                     template,
                     @"\{\{\s*" + Regex.Escape(kv.Key) + @"\s*\}\}",
                     kv.Value ?? "",
-                    RegexOptions.IgnoreCase
-                );
+                    RegexOptions.IgnoreCase);
             }
             return template;
         }
 
-        // ⭐⭐⭐ 唯一允许 CartRows 进入邮件的地方 ⭐⭐⭐
         private static string InjectCartRowsIntoCartTable(string html, string rows)
         {
             if (string.IsNullOrWhiteSpace(html)) return html;
@@ -226,11 +300,52 @@ namespace GownApi.Endpoints
                     html,
                     pattern,
                     m => m.Groups[1].Value + rows + m.Groups[3].Value,
-                    RegexOptions.IgnoreCase
-                );
+                    RegexOptions.IgnoreCase);
             }
 
             return html;
+        }
+
+        private static string InjectCollectionTimeIntoCollectionRow(string html, string? collectionTime)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return html;
+            if (string.IsNullOrWhiteSpace(collectionTime)) return html;
+
+            var safe = WebUtility.HtmlEncode(collectionTime.Trim())
+    .Replace("\r\n", "<br>")
+    .Replace("\n", "<br>")
+    .Replace("\r", "<br>");
+
+
+            html = Regex.Replace(
+                html,
+                @"<div\b[^>]*data-adh\s*=\s*[""']collection-time[""'][^>]*>[\s\S]*?</div>",
+                "",
+                RegexOptions.IgnoreCase);
+
+            var rowPattern =
+                @"(<tr\b[^>]*data-adh\s*=\s*[""']collection-details-row[""'][^>]*>[\s\S]*?<div\b[^>]*style\s*=\s*[""'][^""']*background:#f4f6ff;[\s\S]*?>)([\s\S]*?)(</div>\s*</td>\s*</tr>)";
+
+            if (!Regex.IsMatch(html, rowPattern, RegexOptions.IgnoreCase))
+                return html;
+
+            return Regex.Replace(
+                html,
+                rowPattern,
+                m =>
+                {
+                    var open = m.Groups[1].Value;
+                    var middle = m.Groups[2].Value;
+                    var close = m.Groups[3].Value;
+
+                    var injected = $@"
+<div data-adh=""collection-time"" style=""margin-top:10px; font-size:14px; line-height:1.6;"">
+  <strong>{safe}</strong>
+</div>";
+
+                    return open + middle + injected + close;
+                },
+                RegexOptions.IgnoreCase);
         }
 
         private static string ExtractBodyInnerHtml(string html)
