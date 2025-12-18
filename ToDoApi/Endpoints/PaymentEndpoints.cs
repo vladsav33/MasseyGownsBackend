@@ -1,33 +1,31 @@
-﻿using GownApi.Services;
+﻿using GownApi;
+using GownApi.Model;
+using GownApi.Model.Dto;
+using GownApi.Services;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Xml.Linq;
+using System.Globalization;
 using System.Net;
 using System.Net.Mail;
 using System.Text;
-using GownApi;
-using GownApi.Model;
-using System.Globalization;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace GownApi.Endpoints
 {
     public static class PaymentEndpoints
     {
-        // Config (in production → move to appsettings.json)
         const string PaystationInitiationUrl = "https://www.paystation.co.nz/direct/paystation.dll";
         const string MerchantId = "617970";
         const string GatewayId = "DEVELOPMENT";
-        const string ReturnUrl = "https://yourdomain.com/checkout"; // React route
 
         record PaymentRequest(int Amount, string OrderId);
 
         public static void MapPaymentEndpoints(this WebApplication app)
         {
-            // ---------------- create payment (initiate Paystation) ----------------
             app.MapPost("/api/payment/create-payment", async (
                 PaymentRequest request,
-                [FromServices] IHttpClientFactory httpClientFactory) =>
+                IHttpClientFactory httpClientFactory) =>
             {
                 var httpClient = httpClientFactory.CreateClient();
                 var values = new Dictionary<string, string>
@@ -35,266 +33,339 @@ namespace GownApi.Endpoints
                     { "paystation", "_empty" },
                     { "pstn_pi", MerchantId },
                     { "pstn_gi", GatewayId },
-                    { "pstn_am", request.Amount.ToString() },  // cents
-                    { "pstn_ms", Guid.NewGuid().ToString() },  // merchant session
-                    { "pstn_nr", "t" }                          // test flag
-                    //{ "pstn_du", ReturnUrl }
+                    { "pstn_am", request.Amount.ToString() },
+                    { "pstn_ms", Guid.NewGuid().ToString() },
+                    { "pstn_nr", "t" }
                 };
 
-                var content = new FormUrlEncodedContent(values);
-                var response = await httpClient.PostAsync(PaystationInitiationUrl, content);
+                var response = await httpClient.PostAsync(
+                    PaystationInitiationUrl,
+                    new FormUrlEncodedContent(values)
+                );
+
                 var responseString = await response.Content.ReadAsStringAsync();
-
-                string redirectUrl = ExtractRedirectUrl(responseString);
-
-                return Results.Ok(new
-                {
-                    redirectUrl
-                });
+                return Results.Ok(new { redirectUrl = ExtractRedirectUrl(responseString) });
             });
 
-            // ---------------- Paystation server-to-server notify ----------------
             app.MapPost("/notify", async (HttpRequest req, IConfiguration config, GownDb db) =>
             {
-                // Read raw body so we can log and parse XML
                 req.EnableBuffering();
-                using var reader = new StreamReader(req.Body, Encoding.UTF8, leaveOpen: true);
-                var raw = await reader.ReadToEndAsync();
-                req.Body.Position = 0;
 
-                Console.WriteLine("=== Paystation POST notify ===");
+                string raw;
+                using (var reader = new StreamReader(req.Body, Encoding.UTF8, leaveOpen: true))
+                {
+                    raw = await reader.ReadToEndAsync();
+                    req.Body.Position = 0;
+                }
+
+                Console.WriteLine("=================================================");
+                Console.WriteLine("Paystation notify received");
+                Console.WriteLine($"Time (UTC): {DateTime.UtcNow:O}");
+                Console.WriteLine($"Remote IP: {req.HttpContext.Connection.RemoteIpAddress}");
                 Console.WriteLine($"Content-Type: {req.ContentType}");
+                Console.WriteLine("-------------------------------------------------");
+                Console.WriteLine("Headers:");
                 foreach (var h in req.Headers)
                 {
-                    Console.WriteLine($"H {h.Key}: {h.Value}");
+                    Console.WriteLine($"{h.Key}: {h.Value}");
                 }
-                Console.WriteLine("RAW BODY:");
+                Console.WriteLine("-------------------------------------------------");
+                Console.WriteLine("Raw XML:");
                 Console.WriteLine(raw);
+                Console.WriteLine("-------------------------------------------------");
 
-                // Parse XML
-                var doc = XDocument.Parse(raw);
-                string? Get(string name) => doc.Root?.Element(name)?.Value;
+                XDocument doc;
+                try
+                {
+                    doc = XDocument.Parse(raw);
+                }
+                catch
+                {
+                    Console.WriteLine("Invalid XML");
+                    return Results.Ok("INVALID_XML");
+                }
+
+                string? Get(string n) => doc.Root?.Element(n)?.Value;
 
                 int ec = int.TryParse(Get("ec"), out var ecVal) ? ecVal : -1;
-                var msg = Get("em");
+                var em = Get("em");
                 var txnId = Get("PaystationTransactionID")
                             ?? Get("TransactionID")
                             ?? Get("ti");
                 var merchantSession = Get("MerchantSession");
                 var txnTime = Get("TransactionTime") ?? Get("DigitalReceiptTime");
-                var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var cents) ? cents : 0;
-                var purchaseAmount = purchaseAmountCents / 100m; // Amount Paid from Paystation
+                var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var c) ? c : 0;
+                var purchaseAmount = purchaseAmountCents / 100m;
+                var receiptNumber = Get("ReturnReceiptNumber");
+
+                Console.WriteLine("Parsed fields:");
+                Console.WriteLine($"ec: {ec}");
+                Console.WriteLine($"em: {em}");
+                Console.WriteLine($"txnId: {txnId}");
+                Console.WriteLine($"merchantSession: {merchantSession}");
+                Console.WriteLine($"txnTime: {txnTime}");
+                Console.WriteLine($"purchaseAmount: {purchaseAmount:0.00}");
+                Console.WriteLine($"ReturnReceiptNumber: {receiptNumber}");
+                Console.WriteLine("=================================================");
 
                 if (ec != 0)
                 {
-                    Console.WriteLine($"Paystation notify with ec={ec}, em={msg}, ignored.");
-                    return Results.Ok("OK");
+                    return Results.Ok("IGNORED");
                 }
 
-                Console.WriteLine($"Paystation SUCCESS: txn={txnId}, amount={purchaseAmount}, ms={merchantSession}");
-
-                // For now: use the most recent order
                 var order = await db.orders
                     .OrderByDescending(o => o.Id)
                     .FirstOrDefaultAsync();
 
                 if (order == null)
                 {
-                    Console.WriteLine("No order found – skip sending email.");
                     return Results.Ok("NO_ORDER");
                 }
 
-                // Load ordered items for this order
+                var OrderNumber = !string.IsNullOrWhiteSpace(receiptNumber)
+                    ? $"ORD{receiptNumber}"
+                    : $"ORD{order.Id}";
+
+                string eventTitle = "";
+                string ceremonyDate = "";
+                string collectionTime = "";
+
+                if (order.CeremonyId.HasValue)
+                {
+                    var ceremony = await db.ceremonies
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(ca => ca.Id == order.CeremonyId.Value);
+
+                    if (ceremony != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(ceremony.Name))
+                        {
+                            eventTitle = ceremony.Name;
+                        }
+
+                        if (ceremony.CeremonyDate != null)
+                        {
+                            ceremonyDate = ceremony.CeremonyDate.Value
+                                .ToString("dd MMMM yyyy", CultureInfo.InvariantCulture);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(ceremony.CollectionTime))
+                        {
+                            collectionTime = ceremony.CollectionTime.Trim();
+                        }
+                    }
+                }
+
                 var orderedItems = await db.orderedItems
-                    .Where(oi => oi.OrderId == order.Id)
+                    .Where(o => o.OrderId == order.Id)
                     .ToListAsync();
 
-                // Join with Sku + Items to get item names
-                var skuIds = orderedItems.Select(oi => oi.SkuId).Distinct().ToList();
-                var skuList = await db.Sku
-                    .Where(s => skuIds.Contains(s.Id))
-                    .ToListAsync();
+                var skuIds = orderedItems.Select(o => o.SkuId).Distinct().ToList();
+                var skus = await db.Sku.Where(s => skuIds.Contains(s.Id)).ToListAsync();
+                var itemIds = skus.Select(s => s.ItemId).Distinct().ToList();
+                var items = await db.items.Where(i => itemIds.Contains(i.Id)).ToListAsync();
 
-                var itemIds = skuList.Select(s => s.ItemId).Distinct().ToList();
-                var items = await db.items
-                    .Where(i => itemIds.Contains(i.Id))
-                    .ToListAsync();
-
-                // Calculate totals (Grand Total / Amount Paid / Balance Owing)
                 decimal total = 0m;
-
                 var sbRows = new StringBuilder();
+
                 foreach (var oi in orderedItems)
                 {
-                    var sku = skuList.FirstOrDefault(s => s.Id == oi.SkuId);
+                    var sku = skus.FirstOrDefault(s => s.Id == oi.SkuId);
                     var item = sku != null ? items.FirstOrDefault(i => i.Id == sku.ItemId) : null;
 
-                    var itemName = item?.Name ?? $"Item {oi.SkuId}";
-                    int qty = oi.Quantity;
-                    decimal price = (decimal)oi.Cost;
-                    decimal lineTotal = price * qty;
-                    decimal gst = price * 0.15m; // GST per item = price * 15%
+                    var name = WebUtility.HtmlEncode(item?.Name ?? $"Item {oi.SkuId}");
+                    var qty = oi.Quantity;
+                    var price = (decimal)oi.Cost;
+                    var gst = Math.Round(price * 0.15m * qty, 2);
+                    var lineTotal = price * qty;
 
                     total += lineTotal;
 
                     sbRows.AppendLine($@"
 <tr>
-  <td>{WebUtility.HtmlEncode(itemName)}</td>
-  <td>{qty}</td>
-  <td>{price:0.00}</td>
-  <td>{gst:0.00}</td>
-  <td>{lineTotal:0.00}</td>
+  <td align=""left"">{name}</td>
+  <td align=""center"">{qty}</td>
+  <td align=""right"">{price:0.00}</td>
+  <td align=""right"">{gst:0.00}</td>
+  <td align=""right"">{lineTotal:0.00}</td>
 </tr>");
                 }
 
-                decimal amountPaid = purchaseAmount;           // From Paystation
-                decimal balanceOwing = total - amountPaid;     // Grand Total - Amount Paid
+                var amountPaid = purchaseAmount == 0 ? total : purchaseAmount;
+                var balance = Math.Max(0, total - amountPaid);
 
-                var cartRowsHtml = sbRows.ToString();
-
-                // Load email template
                 var template = await db.EmailTemplates
                     .AsNoTracking()
                     .SingleOrDefaultAsync(t => t.Name == "PaymentCompleted");
 
-                string subject;
-                string bodyHtml;
-                string taxReceiptHtml;
-
-                if (template != null)
+                if (template == null)
                 {
-                    var invoiceDate = order.OrderDate
+                    return Results.Ok("NO_TEMPLATE");
+                }
+
+                var OrderDate = order.OrderDate
                     .ToDateTime(TimeOnly.MinValue)
-                    .ToString("dd MMM yyyy", CultureInfo.CreateSpecificCulture("en-NZ"));
+                    .ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
 
-                    var values = new Dictionary<string, string?>
-                    {
-                        ["TransactionId"] = txnId ?? "",
-                        ["GstNumber"] = "", // can come from config later
-                        ["InvoiceNumber"] = order.Id.ToString(),
-                        ["InvoiceDate"] = invoiceDate,
-                        ["FirstName"] = order.FirstName,
-                        ["LastName"] = order.LastName,
-                        ["Address"] = order.Address,
-                        ["City"] = order.City,
-                        ["Postcode"] = order.Postcode,
-                        ["Country"] = order.Country,
-                        ["StudentId"] = order.StudentId.ToString(),
-                        ["Email"] = order.Email,
-                        ["Total"] = total.ToString("0.00"),
-                        ["AmountPaid"] = amountPaid.ToString("0.00"),
-                        ["BalanceOwing"] = balanceOwing.ToString("0.00"),
-                        ["CartRows"] = cartRowsHtml,
-                        ["Message"] = msg ?? "",
-                        ["MerchantSession"] = merchantSession ?? "",
-                        ["TransactionTime"] = txnTime ?? ""
-                    };
+                var values = new Dictionary<string, string?>
+                {
+                    ["OrderNumber"] = OrderNumber,
+                    ["OrderDate"] = OrderDate,
+                    ["FirstName"] = order.FirstName ?? "",
+                    ["LastName"] = order.LastName ?? "",
+                    ["Address"] = order.Address ?? "",
+                    ["City"] = order.City ?? "",
+                    ["Postcode"] = order.Postcode ?? "",
+                    ["Country"] = order.Country ?? "",
+                    ["StudentId"] = order.StudentId.ToString(),
+                    ["Email"] = order.Email ?? "",
+                    ["Total"] = total.ToString("0.00"),
+                    ["AmountPaid"] = amountPaid.ToString("0.00"),
+                    ["BalanceOwing"] = balance.ToString("0.00"),
+                    ["EventTitle"] = eventTitle,
+                    ["CeremonyDate"] = ceremonyDate
+                };
 
-                    subject = ApplyTemplate(template.SubjectTemplate, values);
-                    bodyHtml = ApplyTemplate(template.BodyHtml, values);
-                    taxReceiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
+                var subject = ApplyTemplate(template.SubjectTemplate, values);
+                var bodyTop = ApplyTemplate(template.BodyHtml, values);
 
-                    var fullHtml = $@"
+                var receiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
+
+                receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
+
+                receiptHtml = InjectCartRowsIntoCartTable(receiptHtml, sbRows.ToString());
+
+                var receiptInner = ExtractBodyInnerHtml(receiptHtml);
+
+                var finalBody = $@"
+<!DOCTYPE html>
 <html>
-  <body>
-    {bodyHtml}
-    <hr />
-    {taxReceiptHtml}
+  <body style=""margin:0;padding:0;"">
+    {bodyTop}
+    <div style=""height:16px;""></div>
+    {receiptInner}
   </body>
 </html>";
 
-                    bodyHtml = fullHtml;
-                }
-                else
-                {
-                    subject = "[TEST] Paystation payment successful (no template)";
-                    bodyHtml = $@"
-<p>A Paystation payment has succeeded (test environment).</p>
-<ul>
-  <li><b>Result</b>: {WebUtility.HtmlEncode(msg ?? "")}</li>
-  <li><b>Transaction ID</b>: {WebUtility.HtmlEncode(txnId ?? "")}</li>
-  <li><b>Amount (Paystation)</b>: {purchaseAmount:0.00}</li>
-  <li><b>Grand Total</b>: {total:0.00}</li>
-  <li><b>Balance Owing</b>: {balanceOwing:0.00}</li>
-  <li><b>MerchantSession</b>: {WebUtility.HtmlEncode(merchantSession ?? "")}</li>
-  <li><b>Time</b>: {WebUtility.HtmlEncode(txnTime ?? "")}</li>
-</ul>";
-                }
-
-                // SMTP configuration (Mailtrap etc.)
-                var smtpHost = config["Smtp:Host"];
-                var smtpPort = int.TryParse(config["Smtp:Port"], out var p) ? p : 587;
-                var smtpUser = config["Smtp:Username"];
-                var smtpPass = config["Smtp:Password"];
-
-                var fromAddress = config["Email:From"] ?? smtpUser;
-
-                // For now still send to test inbox; later you can switch to order.Email
-                var toAddress = config["Email:To"] ?? smtpUser;
-                // var toAddress = order.Email;
-
-                using var client = new SmtpClient(smtpHost!, smtpPort)
+                using var client = new SmtpClient(
+                    config["Smtp:Host"]!,
+                    int.Parse(config["Smtp:Port"] ?? "587"))
                 {
                     EnableSsl = true,
-                    Credentials = new NetworkCredential(smtpUser, smtpPass)
+                    Credentials = new NetworkCredential(
+                        config["Smtp:Username"],
+                        config["Smtp:Password"])
                 };
 
-                var mail = new MailMessage(fromAddress!, toAddress!)
+                var mail = new MailMessage(
+                    config["Email:From"]!,
+                    config["Email:To"]!)
                 {
                     Subject = subject,
-                    Body = bodyHtml,
+                    Body = finalBody,
                     IsBodyHtml = true
                 };
 
                 await client.SendMailAsync(mail);
-                Console.WriteLine("Payment success email sent using CMS template + TaxReceiptHtml.");
-
                 return Results.Ok("OK");
             });
         }
 
-        // Simple {{Key}} template replacement
-        // Simple {{Key}} template replacement – supports {{Key}}, {{ Key }}, etc.
         private static string ApplyTemplate(string template, IDictionary<string, string?> values)
         {
-            if (string.IsNullOrEmpty(template))
-                return string.Empty;
-
-            var result = template;
-
+            if (string.IsNullOrEmpty(template)) return "";
             foreach (var kv in values)
             {
-                var value = kv.Value ?? string.Empty;
-
-                var patterns = new[]
-                {
-            "{{" + kv.Key + "}}",
-            "{{ " + kv.Key + " }}",
-            "{{" + kv.Key + " }}",
-            "{{ " + kv.Key + "}}"
-        };
-
-                foreach (var pattern in patterns)
-                {
-                    result = result.Replace(pattern, value);
-                }
+                template = Regex.Replace(
+                    template,
+                    @"\{\{\s*" + Regex.Escape(kv.Key) + @"\s*\}\}",
+                    kv.Value ?? "",
+                    RegexOptions.IgnoreCase);
             }
-
-            return result;
+            return template;
         }
 
+        private static string InjectCartRowsIntoCartTable(string html, string rows)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return html;
 
-        // Extract DigitalOrder redirect URL from Paystation XML
+            html = Regex.Replace(html, @"\{\{\s*CartRows\s*\}\}", "", RegexOptions.IgnoreCase);
+
+            var pattern =
+                @"(<table\b[^>]*data-adh\s*=\s*[""']cart-table[""'][\s\S]*?<tbody\b[^>]*>)([\s\S]*?)(</tbody>)";
+
+            if (Regex.IsMatch(html, pattern, RegexOptions.IgnoreCase))
+            {
+                return Regex.Replace(
+                    html,
+                    pattern,
+                    m => m.Groups[1].Value + rows + m.Groups[3].Value,
+                    RegexOptions.IgnoreCase);
+            }
+
+            return html;
+        }
+
+        private static string InjectCollectionTimeIntoCollectionRow(string html, string? collectionTime)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return html;
+            if (string.IsNullOrWhiteSpace(collectionTime)) return html;
+
+            var safe = WebUtility.HtmlEncode(collectionTime.Trim())
+    .Replace("\r\n", "<br>")
+    .Replace("\n", "<br>")
+    .Replace("\r", "<br>");
+
+
+            html = Regex.Replace(
+                html,
+                @"<div\b[^>]*data-adh\s*=\s*[""']collection-time[""'][^>]*>[\s\S]*?</div>",
+                "",
+                RegexOptions.IgnoreCase);
+
+            var rowPattern =
+                @"(<tr\b[^>]*data-adh\s*=\s*[""']collection-details-row[""'][^>]*>[\s\S]*?<div\b[^>]*style\s*=\s*[""'][^""']*background:#f4f6ff;[\s\S]*?>)([\s\S]*?)(</div>\s*</td>\s*</tr>)";
+
+            if (!Regex.IsMatch(html, rowPattern, RegexOptions.IgnoreCase))
+                return html;
+
+            return Regex.Replace(
+                html,
+                rowPattern,
+                m =>
+                {
+                    var open = m.Groups[1].Value;
+                    var middle = m.Groups[2].Value;
+                    var close = m.Groups[3].Value;
+
+                    var injected = $@"
+<div data-adh=""collection-time"" style=""margin-top:10px; font-size:14px; line-height:1.6;"">
+  <strong>{safe}</strong>
+</div>";
+
+                    return open + middle + injected + close;
+                },
+                RegexOptions.IgnoreCase);
+        }
+
+        private static string ExtractBodyInnerHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return "";
+            var lower = html.ToLowerInvariant();
+            var start = lower.IndexOf("<body");
+            if (start < 0) return html;
+            start = lower.IndexOf(">", start) + 1;
+            var end = lower.LastIndexOf("</body>");
+            return end > start ? html[start..end].Trim() : html;
+        }
+
         private static string ExtractRedirectUrl(string xml)
         {
-            var start = xml.IndexOf("<DigitalOrder>", StringComparison.OrdinalIgnoreCase);
-            var end = xml.IndexOf("</DigitalOrder>", StringComparison.OrdinalIgnoreCase);
-            if (start >= 0 && end > start)
-            {
-                return xml.Substring(start + "<DigitalOrder>".Length,
-                    end - (start + "<DigitalOrder>".Length));
-            }
-            return string.Empty;
+            var s = xml.IndexOf("<DigitalOrder>", StringComparison.OrdinalIgnoreCase);
+            var e = xml.IndexOf("</DigitalOrder>", StringComparison.OrdinalIgnoreCase);
+            return s >= 0 && e > s
+                ? xml.Substring(s + 14, e - s - 14)
+                : "";
         }
     }
 }
