@@ -1,4 +1,5 @@
-﻿using GownApi.Model;
+﻿using DocumentFormat.OpenXml.Drawing.Charts;
+using GownApi.Model;
 using GownApi.Model.Dto;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,16 @@ namespace GownApi.Services
                 OrderDate = orderDto.OrderDate,
                 DegreeId = orderDto.DegreeId,
                 CeremonyId = orderDto.CeremonyId,
+                OrderType = orderDto.OrderType,
+                Note = orderDto.Note,
+                Changes = orderDto.Changes,
+                AmountPaid = orderDto.AmountPaid,
+                AmountOwning = orderDto.AmountOwning,
+                Donation = orderDto.Donation,
+                Freight = orderDto.Freight,
+                Refund = orderDto.Refund,
+                AdminCharges = orderDto.AdminCharges,
+                PayBy = orderDto.PayBy,
             };
         }
 
@@ -72,7 +83,17 @@ namespace GownApi.Services
                 OrderDate = order.OrderDate,
                 Items = items,
                 CeremonyId = order.CeremonyId,
-                DegreeId = order.DegreeId
+                DegreeId = order.DegreeId,
+                OrderType = order.OrderType,
+                Note = order.Note,
+                Changes = order.Changes,
+                AmountPaid = order.AmountPaid,
+                AmountOwning = order.AmountOwning,
+                Donation = order.Donation,
+                Freight = order.Freight,
+                Refund = order.Refund,
+                AdminCharges = order.AdminCharges,
+                PayBy = order.PayBy,
             };
         }
 

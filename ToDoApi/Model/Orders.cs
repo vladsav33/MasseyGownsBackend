@@ -20,5 +20,16 @@
         public DateOnly OrderDate { get; set; }
         public int? CeremonyId { get; set; }
         public int? DegreeId { get; set; }
+        public string? OrderType { get; set; }
+        public string? Note { get; set; }
+        public string? Changes { get; set; }
+        public string? PackNote { get; set; }
+        public float? AmountPaid { get; set; }
+        public float? AmountOwning {  get; set; }
+        public float? Donation {  get; set; }
+        public float? Freight { get; set; }
+        public float? Refund { get; set; }
+        public float? AdminCharges { get; set; }
+        public DateOnly? PayBy { get; set; }
     }
 }

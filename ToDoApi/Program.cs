@@ -20,6 +20,8 @@ builder.Services.AddSingleton(emailSettings);
 // Email service
 builder.Services.AddScoped<IEmailService, EmailService>();
 
+builder.Services.AddScoped<IPdfService, PdfService>();
+
 var connectionString = builder.Configuration.GetConnectionString("GownDb");
 
 var key = Encoding.ASCII.GetBytes("SuperSecretKey123!"); //  Use a secure key in production
