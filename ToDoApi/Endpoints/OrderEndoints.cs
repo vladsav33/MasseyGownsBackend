@@ -102,6 +102,16 @@ namespace GownApi.Endpoints
                 order.PaymentMethod = updatedOrder.PaymentMethod;
                 order.PurchaseOrder = updatedOrder.PurchaseOrder;
                 order.OrderDate = updatedOrder.OrderDate;
+                order.OrderType = updatedOrder.OrderType;
+                order.Note = updatedOrder.Note;
+                order.Changes = updatedOrder.Changes;
+                order.AmountPaid = updatedOrder.AmountPaid;
+                order.AmountOwning = updatedOrder.AmountOwning;
+                order.Donation = updatedOrder.Donation;
+                order.Freight = updatedOrder.Freight;
+                order.Refund = updatedOrder.Refund;
+                order.AdminCharges = updatedOrder.AdminCharges;
+                order.PayBy = updatedOrder.PayBy;
 
                 await db.SaveChangesAsync();
                 return Results.Ok(order);
