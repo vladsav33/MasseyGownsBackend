@@ -3,7 +3,12 @@
     public class AddressLabelDto
     {
         public string LabelType { get; set; } = "";  
-        public int SourceId { get; set; }             
+        public int SourceId { get; set; }
+
+        public DateOnly? OrderDate { get; set; }
+        public string? OrderNumber { get; set; }
+        public string? OrderType { get; set; }
+
 
         public string ToName { get; set; } = "";
         public string? Attn { get; set; }
@@ -14,6 +19,8 @@
 
         public string City { get; set; } = "";
         public string Postcode { get; set; } = "";
+
+     
     }
 
 }

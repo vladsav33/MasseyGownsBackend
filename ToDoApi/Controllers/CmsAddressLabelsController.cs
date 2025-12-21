@@ -8,7 +8,6 @@ namespace GownApi.Controllers
     [Route("api/cms/address-labels")]
     public class CmsAddressLabelsController : ControllerBase
     {
-        
         private readonly GownDb _db;
 
         public CmsAddressLabelsController(GownDb db)
@@ -16,11 +15,6 @@ namespace GownApi.Controllers
             _db = db;
         }
 
-        /// <summary>
-        /// type: "individual" | "institution"
-        /// dateFrom/dateTo: yyyy-MM-dd
-        /// name: search by full name (first + last) or institution name
-        /// </summary>
         [HttpGet]
         public async Task<ActionResult<List<AddressLabelDto>>> GetLabels(
             [FromQuery] string type,
@@ -32,7 +26,6 @@ namespace GownApi.Controllers
 
             if (type != "individual" && type != "institution")
                 return BadRequest("type must be 'individual' or 'institution'.");
-
 
             if (type == "individual")
             {
@@ -47,11 +40,19 @@ namespace GownApi.Controllers
                 var nameQ = (name ?? "").Trim();
                 if (!string.IsNullOrWhiteSpace(nameQ))
                 {
-                    var lowered = nameQ.ToLower();
-                    q = q.Where(o =>
-                        ((o.FirstName ?? "") + " " + (o.LastName ?? ""))
-                            .ToLower()
-                            .Contains(lowered));
+                    var lowered = nameQ.ToLowerInvariant();
+
+                    if (int.TryParse(nameQ, out var id))
+                    {
+                        q = q.Where(o => o.Id == id);
+                    }
+                    else
+                    {
+                        q = q.Where(o =>
+                            ((o.FirstName ?? "") + " " + (o.LastName ?? ""))
+                                .ToLower()
+                                .Contains(lowered));
+                    }
                 }
 
                 var labels = await q
@@ -59,9 +60,12 @@ namespace GownApi.Controllers
                     .Select(o => new AddressLabelDto
                     {
                         LabelType = "individual",
+                        OrderType = "individual",
                         SourceId = o.Id,
+                        OrderDate = o.OrderDate,
+                        OrderNumber = o.Id.ToString(),
                         ToName = (o.FirstName ?? "") + " " + (o.LastName ?? ""),
-                        Attn = o.FirstName,          
+                        Attn = o.FirstName,
                         Phone = o.Mobile,
                         Address1 = o.Address ?? "",
                         Address2 = null,
@@ -73,22 +77,16 @@ namespace GownApi.Controllers
                 return Ok(labels);
             }
 
-
-
-            // institution
-            // data: bulkOrders + ceremonies
-            // join: bulkOrders.CeremonyId == ceremonies.Id
             var q2 = _db.bulkOrders
                 .AsNoTracking()
                 .Join(
                     _db.ceremonies.AsNoTracking(),
-                    bo => bo.CeremonyId,   
+                    bo => bo.CeremonyId,
                     c => c.Id,
                     (bo, c) => new { bo, c }
                 )
                 .AsQueryable();
 
-            // date filter uses ceremonies.DespatchDate
             if (dateFrom.HasValue)
                 q2 = q2.Where(x => x.c.DespatchDate.HasValue && x.c.DespatchDate.Value >= dateFrom.Value);
 
@@ -98,8 +96,16 @@ namespace GownApi.Controllers
             var instNameQ = (name ?? "").Trim();
             if (!string.IsNullOrWhiteSpace(instNameQ))
             {
-                var lowered = instNameQ.ToLower();
-                q2 = q2.Where(x => (x.c.InstitutionName ?? "").ToLower().Contains(lowered));
+                var lowered = instNameQ.ToLowerInvariant();
+
+                if (int.TryParse(instNameQ, out var id))
+                {
+                    q2 = q2.Where(x => x.bo.Id == id);
+                }
+                else
+                {
+                    q2 = q2.Where(x => (x.c.InstitutionName ?? "").ToLower().Contains(lowered));
+                }
             }
 
             var labels2 = await q2
@@ -107,19 +113,21 @@ namespace GownApi.Controllers
                 .Select(x => new AddressLabelDto
                 {
                     LabelType = "institution",
+                    OrderType = "institution",
                     SourceId = x.bo.Id,
+                    OrderDate = null,
+                    OrderNumber = x.bo.Id.ToString(),
                     ToName = x.c.InstitutionName ?? "",
                     Attn = x.c.Organiser,
                     Phone = x.c.Phone,
                     Address1 = x.c.CourierAddress ?? "",
                     Address2 = null,
                     City = x.c.City ?? "",
-                    Postcode = "" 
+                    Postcode = ""
                 })
                 .ToListAsync();
 
             return Ok(labels2);
-
         }
     }
 }
