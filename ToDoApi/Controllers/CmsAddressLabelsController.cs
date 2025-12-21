@@ -61,7 +61,7 @@ namespace GownApi.Controllers
                         LabelType = "individual",
                         SourceId = o.Id,
                         ToName = (o.FirstName ?? "") + " " + (o.LastName ?? ""),
-                        Attn = o.FirstName,          // 你之前确认：个人 Attn = first_name
+                        Attn = o.FirstName,          
                         Phone = o.Mobile,
                         Address1 = o.Address ?? "",
                         Address2 = null,
@@ -82,7 +82,7 @@ namespace GownApi.Controllers
                 .AsNoTracking()
                 .Join(
                     _db.ceremonies.AsNoTracking(),
-                    bo => bo.CeremonyId,   // 如果这里报错，说明 BulkOrder 实体字段名不是 CeremonyId（下一步我再帮你对齐）
+                    bo => bo.CeremonyId,   
                     c => c.Id,
                     (bo, c) => new { bo, c }
                 )
@@ -114,7 +114,7 @@ namespace GownApi.Controllers
                     Address1 = x.c.CourierAddress ?? "",
                     Address2 = null,
                     City = x.c.City ?? "",
-                    Postcode = "" // ceremonies 没有 Postcode 字段，所以先留空
+                    Postcode = "" 
                 })
                 .ToListAsync();
 
