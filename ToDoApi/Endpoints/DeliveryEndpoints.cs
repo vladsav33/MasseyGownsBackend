@@ -1,6 +1,7 @@
 ﻿using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Nodes;
 
 namespace GownApi.Endpoints
 {
@@ -27,6 +28,42 @@ namespace GownApi.Endpoints
 
                 var itemsDtoList = itemsDto.ToList();
                 return Results.Ok(itemsDtoList);
+            });
+
+            app.MapPut("/delivery/{id}", async (int id, DeliveryDto updatedDelivery, GownDb db, ILogger<Program> logger) =>
+            {
+                logger.LogInformation("PUT /deliverys/id called with ID={id}, Body={@updatedDelivery}", id, updatedDelivery);
+
+                if (id != updatedDelivery.Id)
+                    return Results.BadRequest("ID in URL and body must match");
+
+                var delivery = await db.items.FindAsync(id);
+                if (delivery is null)
+                    return Results.NotFound();
+
+                delivery.Name = updatedDelivery.Name;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(delivery);
+            });
+
+
+            app.MapPut("/delivery/cost/{id}", async (int id, DeliveryDto updatedDelivery, GownDb db, ILogger<Program> logger) =>
+            {
+                logger.LogInformation("PUT /deliverys/cost/id called with ID={id}, Body={@updatedDelivery}", id, updatedDelivery);
+
+                if (id != updatedDelivery.Id)
+                    return Results.BadRequest("ID in URL and body must match");
+
+                var delivery = await db.sizes.FindAsync(id);
+                if (delivery is null)
+                    return Results.NotFound();
+
+                delivery.Size = updatedDelivery.Name;
+                delivery.Price = updatedDelivery.Cost;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(delivery);
             });
         }
     }

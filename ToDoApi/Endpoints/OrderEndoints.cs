@@ -58,6 +58,8 @@ namespace GownApi.Endpoints
                     } else { 
                         logger.LogInformation("Found Sku Id: {0}", skuId[0].Id);
                     }
+                    logger.LogInformation("Creating orderted items with order id: {0}, skuid: {1}, quantity: {2}, hire: {3}, cost: {4}",
+                        order.Id, skuId[0].Id, item.Quantity, item.Hire, item.Hire ? itemNew.HirePrice : itemNew.BuyPrice);
                     var orderedItems = new OrderedItems
                     {
                         OrderId = order.Id,
