@@ -1,8 +1,10 @@
-﻿using GownApi.Model;
+﻿using DocumentFormat.OpenXml.Office2010.Excel;
+using GownApi.Model;
 using GownApi.Model.Dto;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace GownApi.Endpoints
 {
@@ -57,7 +59,7 @@ namespace GownApi.Endpoints
             });
 
             app.MapPost("/admin/ceremonies/{ceremonyId}/degrees",
-                async (int ceremonyId, List<DegreeUpdateDto> updates, GownDb db) =>
+                async (int ceremonyId, List<DegreeUpdateDto> updates, GownDb db, ILogger<Program> logger) =>
             {
                 if (updates == null || updates.Count == 0)
                     return Results.BadRequest("No updates provided.");
@@ -69,12 +71,14 @@ namespace GownApi.Endpoints
 
                 foreach (var update in updates)
                 {
+                    logger.LogInformation("DegreeId={degreeId} JsonBody={@updates}", update.DegreeId, update);
                     var record = existing.FirstOrDefault(cd => cd.DegreeId == update.DegreeId);
 
                     if (record != null)
                     {
+                        logger.LogInformation("POST /admin/ceremonies/{ceremonyid}/degrees called with ID={ceremonyId}, Body={@updates}", ceremonyId, ceremonyId, update);
                         // Update existing row
-                        record.Active = update.Active;
+                        record.Active = update.Active ?? false;
                     }
                     else
                     {
@@ -83,7 +87,7 @@ namespace GownApi.Endpoints
                         {
                             GraduationId = ceremonyId,
                             DegreeId = update.DegreeId,
-                            Active = update.Active
+                            Active = update.Active ?? false
                         });
                     }
                 }
@@ -97,7 +101,7 @@ namespace GownApi.Endpoints
         public class DegreeUpdateDto
         {
             public int DegreeId { get; set; }
-            public bool Active { get; set; }
+            public bool? Active { get; set; }
         }
     }
 }

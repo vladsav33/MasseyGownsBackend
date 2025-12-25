@@ -1,7 +1,11 @@
 ﻿using AutoMapper;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using GownApi.Model;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace GownApi.Endpoints
 {
@@ -16,12 +20,24 @@ namespace GownApi.Endpoints
 
             });
 
-            app.MapPost("/admin/ceremonies", async (Ceremonies ceremony, GownDb db) =>
+            app.MapPost("/admin/ceremonies", async (Ceremonies ceremony, GownDb db, ILogger<Program> logger) =>
                 {
-                    db.ceremonies.Add(ceremony);
-                    await db.SaveChangesAsync();
+                    logger.LogInformation("POST /admin/ceremonies called with Body={@updatedCeremony}", ceremony);
+                    try
+                    {
+                        db.ceremonies.Add(ceremony);
+                        await db.SaveChangesAsync();
 
-                    return Results.Created($"/ceremonies/{ceremony.Id}", ceremony);
+                        return Results.Created($"/ceremonies/{ceremony.Id}", ceremony);
+                    } catch (DbUpdateException ex) when (
+                        ex.InnerException is PostgresException pg &&
+                        pg.SqlState == PostgresErrorCodes.UniqueViolation)
+                    {
+                        return Results.Conflict(new
+                        {
+                            message = "Ceremony code must be unique."
+                        });
+                    }
                 });
 
             app.MapPut("/admin/ceremonies/{id}", async (int id, Ceremonies updatedCeremony, GownDb db, ILogger<Program> logger) =>
@@ -31,7 +47,7 @@ namespace GownApi.Endpoints
                     WriteIndented = true // pretty-print JSON
                 });
 
-                logger.LogInformation("PUT /ceremonies/id called with ID={id}, Body={@updatedCeremony}", id, jsonBody);
+                logger.LogInformation("PUT /admin/ceremonies/id called with ID={id}, Body={@updatedCeremony}", id, jsonBody);
 
                 if (id != updatedCeremony.Id)
                     return Results.BadRequest("ID in URL and body must match");
@@ -48,30 +64,7 @@ namespace GownApi.Endpoints
                 IMapper mapper = config.CreateMapper();
                 mapper.Map(updatedCeremony, ceremony);
 
-
-                //// Update fields
-                //ceremony.Name = updatedCeremony.Name;
-                //ceremony.CeremonyDate = updatedCeremony.CeremonyDate;
-                //ceremony.DueDate = updatedCeremony.DueDate;
-                //ceremony.Visible = updatedCeremony.Visible;
-                //ceremony.IdCode = updatedCeremony.IdCode;
-                //ceremony.InstitutionName = updatedCeremony.InstitutionName;
-                //ceremony.City = updatedCeremony.City;
-                //ceremony.CourierAddress = updatedCeremony.CourierAddress;
-                //ceremony.PostalAddress = updatedCeremony.PostalAddress;
-                //ceremony.DespatchDate = updatedCeremony.DespatchDate;
-                //ceremony.DateSent = updatedCeremony.DateSent;
-                //ceremony.ReturnDate = updatedCeremony.ReturnDate;
-                //ceremony.DateReturned = updatedCeremony.DateReturned;
-                //ceremony.Organiser = updatedCeremony.Organiser;
-                //ceremony.Phone = updatedCeremony.Phone;
-                //ceremony.Email = updatedCeremony.Email;
-                //ceremony.InvoiceEmail = updatedCeremony.InvoiceEmail;
-                //ceremony.PriceCode = updatedCeremony.PriceCode;
-                //ceremony.Freight = updatedCeremony.Freight;
-
                 await db.SaveChangesAsync();
-
                 return Results.Ok(ceremony);
             });
         }
