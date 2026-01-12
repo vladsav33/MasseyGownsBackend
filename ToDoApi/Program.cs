@@ -124,6 +124,7 @@ app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
 app.AdminCeremonyEndpoints();
 app.AdminUserEndpoints();
+app.AdminHoodEndpoints();
 app.MapDegreeEndpoints();
 app.MapItemEndpoints();
 app.MapFaqEndpoints();
