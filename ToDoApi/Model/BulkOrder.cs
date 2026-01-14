@@ -12,5 +12,7 @@
         public string? HoodType { get; set; }
         public string? UcolSash {  get; set; }
         public int CeremonyId { get; set; }
+        public DateOnly? OrderDate { get; set; }
+
     }
 }
