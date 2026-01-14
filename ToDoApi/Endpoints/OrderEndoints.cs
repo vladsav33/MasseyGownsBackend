@@ -118,6 +118,22 @@ namespace GownApi.Endpoints
                 await db.SaveChangesAsync();
                 return Results.Ok(order);
             });
+
+            app.MapPatch("/orders/{id}", async (int id, OrderDtoUpdate updatedOrder, GownDb db) =>
+            {
+                var order = await db.orders.FindAsync(id);
+                if (order is null) 
+                    return Results.NotFound();
+
+                if (updatedOrder.Paid.HasValue)
+                    order.Paid = updatedOrder.Paid;
+
+                if (updatedOrder.Status is not null)
+                    order.Status = updatedOrder.Status;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(updatedOrder);
+            });
         }
     }
 }

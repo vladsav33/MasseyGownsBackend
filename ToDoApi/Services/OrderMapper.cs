@@ -77,7 +77,7 @@ namespace GownApi.Services
                 Mobile = order.Mobile,
                 StudentId = order.StudentId,
                 Message = order.Message,
-                Paid = order.Paid,
+                Paid = order.Paid ?? false,
                 PaymentMethod = order.PaymentMethod,
                 PurchaseOrder = order.PurchaseOrder,
                 OrderDate = order.OrderDate,
