@@ -47,6 +47,7 @@ namespace GownApi.Endpoints
                 return Results.Ok(new { redirectUrl = ExtractRedirectUrl(responseString) });
             });
 
+            //Get response from Paystation notify
             app.MapPost("/notify", async (HttpRequest req, IConfiguration config, GownDb db) =>
             {
                 req.EnableBuffering();

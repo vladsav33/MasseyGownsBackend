@@ -66,7 +66,7 @@ namespace GownApi.Controllers
                         OrderNumber = o.Id.ToString(),
                         ToName = (o.FirstName ?? "") + " " + (o.LastName ?? ""),
                         Attn = o.FirstName,
-                        Phone = o.Mobile,
+                        Phone = o.Phone,
                         Address1 = o.Address ?? "",
                         Address2 = null,
                         City = o.City ?? "",
@@ -87,11 +87,12 @@ namespace GownApi.Controllers
                 )
                 .AsQueryable();
 
+            // Use bulk_orders.OrderDate for filtering institution records
             if (dateFrom.HasValue)
-                q2 = q2.Where(x => x.c.DespatchDate.HasValue && x.c.DespatchDate.Value >= dateFrom.Value);
+                q2 = q2.Where(x => x.bo.OrderDate.HasValue && x.bo.OrderDate.Value >= dateFrom.Value);
 
             if (dateTo.HasValue)
-                q2 = q2.Where(x => x.c.DespatchDate.HasValue && x.c.DespatchDate.Value <= dateTo.Value);
+                q2 = q2.Where(x => x.bo.OrderDate.HasValue && x.bo.OrderDate.Value <= dateTo.Value);
 
             var instNameQ = (name ?? "").Trim();
             if (!string.IsNullOrWhiteSpace(instNameQ))
@@ -109,13 +110,13 @@ namespace GownApi.Controllers
             }
 
             var labels2 = await q2
-                .OrderByDescending(x => x.c.DespatchDate)
+                .OrderByDescending(x => x.bo.OrderDate)
                 .Select(x => new AddressLabelDto
                 {
                     LabelType = "institution",
                     OrderType = "institution",
                     SourceId = x.bo.Id,
-                    OrderDate = null,
+                    OrderDate = x.bo.OrderDate,
                     OrderNumber = x.bo.Id.ToString(),
                     ToName = x.c.InstitutionName ?? "",
                     Attn = x.c.Organiser,
