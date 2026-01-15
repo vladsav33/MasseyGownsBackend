@@ -19,14 +19,17 @@ namespace GownApi.Endpoints
         const string MerchantId = "617970";
         const string GatewayId = "DEVELOPMENT";
 
-        record PaymentRequest(int Amount, string OrderId);
+        record PaymentRequest(int Amount, string OrderNumber);
 
         public static void MapPaymentEndpoints(this WebApplication app)
         {
             app.MapPost("/api/payment/create-payment", async (
                 PaymentRequest request,
-                IHttpClientFactory httpClientFactory) =>
+                IHttpClientFactory httpClientFactory,
+                ILogger<Program> logger) =>
             {
+                logger.LogInformation("Request amount {0}, Request order number {1}", request.Amount.ToString(), request.OrderNumber);
+
                 var httpClient = httpClientFactory.CreateClient();
                 var values = new Dictionary<string, string>
                 {
@@ -35,7 +38,7 @@ namespace GownApi.Endpoints
                     { "pstn_gi", GatewayId },
                     { "pstn_am", request.Amount.ToString() },
                     //{ "pstn_ms", Guid.NewGuid().ToString() },
-                    { "pstn_ms", request.OrderId },
+                    { "pstn_ms", request.OrderNumber },
                     { "pstn_nr", "t" }
                 };
 
