@@ -34,7 +34,8 @@ namespace GownApi.Endpoints
                     { "pstn_pi", MerchantId },
                     { "pstn_gi", GatewayId },
                     { "pstn_am", request.Amount.ToString() },
-                    { "pstn_ms", Guid.NewGuid().ToString() },
+                    //{ "pstn_ms", Guid.NewGuid().ToString() },
+                    { "pstn_ms", request.OrderId },
                     { "pstn_nr", "t" }
                 };
 
