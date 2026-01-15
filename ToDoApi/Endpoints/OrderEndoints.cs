@@ -135,7 +135,7 @@ namespace GownApi.Endpoints
                     order.Status = updatedOrder.Status;
 
                 await db.SaveChangesAsync();
-                return Results.Ok(updatedOrder);
+                return Results.Ok(order);
             });
         }
     }

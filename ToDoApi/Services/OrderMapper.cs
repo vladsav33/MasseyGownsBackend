@@ -94,6 +94,7 @@ namespace GownApi.Services
                 Refund = order.Refund,
                 AdminCharges = order.AdminCharges,
                 PayBy = order.PayBy,
+                Status = order.Status
             };
         }
 
