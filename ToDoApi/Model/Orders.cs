@@ -31,5 +31,6 @@
         public float? Refund { get; set; }
         public float? AdminCharges { get; set; }
         public DateOnly? PayBy { get; set; }
+        public string? Reference_no { get; set; }
     }
 }

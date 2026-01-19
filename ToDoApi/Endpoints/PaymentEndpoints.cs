@@ -109,14 +109,34 @@ namespace GownApi.Endpoints
                 Console.WriteLine($"ReturnReceiptNumber: {receiptNumber}");
                 Console.WriteLine("=================================================");
 
-                if (ec != 0)
+                /*if (ec != 0)
                 {
                     return Results.Ok("IGNORED");
                 }
 
                 var order = await db.orders
                     .OrderByDescending(o => o.Id)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultAsync();*/
+
+                var order = await db.orders
+    .OrderByDescending(o => o.Id)
+    .FirstOrDefaultAsync();
+
+                if (order == null)
+                {
+                    return Results.Ok("NO_ORDER");
+                }
+
+                
+                order.Paid = (ec == 0);
+                await db.SaveChangesAsync();
+
+                
+                if (ec != 0)
+                {
+                    return Results.Ok("PAYMENT_FAILED_UPDATED");
+                }
+
 
                 if (order == null)
                 {
