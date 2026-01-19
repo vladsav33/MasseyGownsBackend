@@ -1,7 +1,9 @@
 ﻿using AutoMapper;
+using DocumentFormat.OpenXml.InkML;
 using DocumentFormat.OpenXml.Office2010.Excel;
 using GownApi.Model;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Text.Json;
@@ -18,6 +20,27 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/ceremonies", async (GownDb db) => {
                 return await db.ceremonies.OrderBy(c => c.Name).ToListAsync();
 
+            });
+
+            app.MapGet("admin/ceremonies/bulk/{id}", async (int id, GownDb db) =>
+            {
+                var sql = @"
+                    SELECT COUNT(hat_type) AS hat_count,
+                           COUNT(gown_type) AS gown_count,
+                           COUNT(hood_type) AS hood_count,
+                           COUNT(ucol_sash) AS ucol_count
+                    FROM bulk_orders
+                    WHERE ceremony_id = @id";
+
+                var param = new NpgsqlParameter("@id", id);
+
+                // Execute query and map to DTO
+                var result = await db.countBulkDto
+                    .FromSqlRaw(sql, param)
+                    .AsNoTracking()
+                    .FirstAsync();
+
+                return Results.Ok(result);
             });
 
             app.MapPost("/admin/ceremonies", async (Ceremonies ceremony, GownDb db, ILogger<Program> logger) =>

@@ -30,11 +30,13 @@ namespace GownApi
         public DbSet<Sku> Sku { get; set; }
         public DbSet<CmsContentBlock> CmsContentBlocks { get; set; }
         public DbSet<EmailTemplate> EmailTemplates { get; set; } 
+        public DbSet<CountBulkDto> countBulkDto { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<ItemDegreeModel>().HasNoKey();  // tells EF Core it's a query type
+            modelBuilder.Entity<CountBulkDto>().HasNoKey();  // tells EF Core it's a query type
         }
     }
 }

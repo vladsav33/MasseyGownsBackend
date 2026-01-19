@@ -66,7 +66,9 @@ namespace GownApi.Endpoints
                 var order = OrderMapper.FromDto(orderDto);
 
                 db.orders.Add(order);
-                db.SaveChanges();
+                await db.SaveChangesAsync();
+                var updatedOrder = await db.orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == order.Id);
+
                 foreach (var item in orderDto.Items) {
                     var itemNew = await db.items.FindAsync(item.ItemId);
                     var skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId);
@@ -77,6 +79,7 @@ namespace GownApi.Endpoints
                     if (!skuId.Any()) {
                         db.Sku.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId });
                         await db.SaveChangesAsync();
+                        skuId.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId });
                     } else { 
                         logger.LogInformation("Found Sku Id: {0}", skuId[0].Id);
                     }
@@ -97,7 +100,7 @@ namespace GownApi.Endpoints
 
                 logger.LogInformation("POST /orders called, result: {id}", result);
 
-                return Results.Created($"/orders/{order.Id}", order);
+                return Results.Created($"/orders/{updatedOrder.Id}", updatedOrder);
             });
 
             app.MapPut("/orders/{id}", async (int id, Orders updatedOrder, GownDb db, ILogger<Program> logger) =>
@@ -136,6 +139,22 @@ namespace GownApi.Endpoints
                 order.Refund = updatedOrder.Refund;
                 order.AdminCharges = updatedOrder.AdminCharges;
                 order.PayBy = updatedOrder.PayBy;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(order);
+            });
+
+            app.MapPatch("/orders/{id}", async (int id, OrderDtoUpdate updatedOrder, GownDb db) =>
+            {
+                var order = await db.orders.FindAsync(id);
+                if (order is null) 
+                    return Results.NotFound();
+
+                if (updatedOrder.Paid.HasValue)
+                    order.Paid = updatedOrder.Paid;
+
+                if (updatedOrder.Status is not null)
+                    order.Status = updatedOrder.Status;
 
                 await db.SaveChangesAsync();
                 return Results.Ok(order);
