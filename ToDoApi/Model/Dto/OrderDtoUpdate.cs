@@ -3,6 +3,6 @@
     public class OrderDtoUpdate
     {
         public bool? Paid { get; set; }
-        public string? Status { get; set; }
+        public int? Status { get; set; }
     }
 }
