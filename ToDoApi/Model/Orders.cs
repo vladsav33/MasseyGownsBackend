@@ -7,6 +7,7 @@
         public string LastName { get; set; }
         public string Email { get; set; }
         public string Address { get; set; }
+        public string? Region { get; set; }
         public string City { get; set; }
         public string Postcode { get; set; }
         public string Country { get; set; }
@@ -19,6 +20,7 @@
         public string? PurchaseOrder { get; set; }
         public DateOnly OrderDate { get; set; }
         public int? CeremonyId { get; set; }
+        public string? Ceremony { get; set; }
         public int? DegreeId { get; set; }
         public string? OrderType { get; set; }
         public string? Note { get; set; }

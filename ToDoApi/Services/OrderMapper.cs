@@ -20,6 +20,7 @@ namespace GownApi.Services
                 Email = orderDto.Email,
                 Address = orderDto.Address,
                 City = orderDto.City,
+                Region = orderDto.Region,
                 Postcode = orderDto.Postcode,
                 Country = orderDto.Country,
                 Phone = orderDto.Phone,
@@ -71,6 +72,7 @@ namespace GownApi.Services
                 Email = order.Email,
                 Address = order.Address,
                 City = order.City,
+                Region = order.Region,
                 Postcode = order.Postcode,
                 Country = order.Country,
                 Phone = order.Phone,
@@ -83,6 +85,7 @@ namespace GownApi.Services
                 OrderDate = order.OrderDate,
                 Items = items,
                 CeremonyId = order.CeremonyId,
+                Ceremony = order.Ceremony,
                 DegreeId = order.DegreeId,
                 OrderType = order.OrderType,
                 Note = order.Note,
@@ -94,7 +97,8 @@ namespace GownApi.Services
                 Refund = order.Refund,
                 AdminCharges = order.AdminCharges,
                 PayBy = order.PayBy,
-                Status = order.Status
+                Status = order.Status,
+                ReferenceNo = order.ReferenceNo
             };
         }
 
