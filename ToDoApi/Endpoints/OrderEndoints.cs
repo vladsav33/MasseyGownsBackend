@@ -13,9 +13,9 @@ namespace GownApi.Endpoints
             app.MapGet("/orders", async (GownDb db, bool ? numbers = false) =>
             {
                 //var result = await db.orders.ToListAsync();
-                List<Orders> result = new();
+                List<OrderGet> result = new();
                 if (numbers == true)
-                    result = await db.orders
+                    result = await db.orderGets
                         .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.region, o.postcode, o.country, o.phone,
                                       o.mobile, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
@@ -27,7 +27,7 @@ namespace GownApi.Endpoints
                                       ORDER BY o.reference_no DESC")
                         .ToListAsync();
                 else
-                    result = await db.orders
+                    result = await db.orderGets
                         .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.region, o.postcode, o.country, o.phone,
                                       o.mobile, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
@@ -50,7 +50,7 @@ namespace GownApi.Endpoints
 
             app.MapGet("/orders/{id}", async (int id, GownDb db, ILogger < Program > logger) =>
             {
-                var order = await db.orders.FindAsync(id);
+                var order = await db.orderGets.FindAsync(id);
 
                 logger.LogInformation("GET /orders/id called with ID={id}", id);
                 if (order is null)

@@ -46,7 +46,7 @@ namespace GownApi.Services
             };
         }
 
-        public static async Task<OrderDtoOut> ToDtoOut(Orders order, GownDb db)
+        public static async Task<OrderDtoOut> ToDtoOut(OrderGet order, GownDb db)
         {
             if (order == null)
                 return null;
