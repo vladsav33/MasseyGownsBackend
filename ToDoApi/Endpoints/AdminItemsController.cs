@@ -2,6 +2,7 @@
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Text.Json;
 
 namespace GownApi.Endpoints
@@ -163,6 +164,38 @@ namespace GownApi.Endpoints
                 }    
 
                 return Results.Ok();
+            });
+
+            app.MapGet("/admin/items/ceremony/{id}", async (int id, GownDb db) => {
+
+                var sql = @"SELECT o.id as id, o.first_name, o.last_name, 
+                                STRING_AGG(s.gown_size::text, ', ') FILTER (WHERE i.category = 'Academic Gown')  AS gown_size,
+                                STRING_AGG(s.stole_size, ', ') FILTER (WHERE i.category = 'Academic Gown') AS stole_size,
+                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Headwear') AS hat_size,
+                                STRING_AGG(h.short_name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_name
+                                FROM orders o
+                                INNER JOIN ordered_items oi
+                                ON oi.order_id = o.id
+                                INNER JOIN sku sk
+                                ON oi.sku_id = sk.id
+                                INNER JOIN items i
+                                ON i.id = sk.item_id
+                                LEFT JOIN sizes s
+                                ON sk.size_id = s.id
+                                LEFT JOIN hood_type h
+                                ON sk.hood_id = h.id
+                                WHERE i.category <> 'Donation' AND ceremony_id = @id
+                                GROUP BY o.id, o.first_name, o.last_name
+                                ORDER BY o.id";
+
+                var param = new NpgsqlParameter("@id", id);
+
+                var itemsDetails = await db.itemDetails
+                    .FromSqlRaw(sql, param)
+                    //.AsNoTracking()
+                    .ToListAsync();
+
+                return Results.Ok(itemsDetails);
             });
         }
         public class ItemsUpdateDto
