@@ -1,4 +1,5 @@
 ﻿using DocumentFormat.OpenXml.Drawing.Charts;
+using DocumentFormat.OpenXml.VariantTypes;
 using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
@@ -12,9 +13,34 @@ namespace GownApi.Endpoints
     {
         public static void MapOrderEnpoints(this WebApplication app)
         {
-            app.MapGet("/orders", async (GownDb db) =>
+            app.MapGet("/orders", async (GownDb db, bool ? numbers = false) =>
             {
-                var result = await db.orders.ToListAsync();
+                //var result = await db.orders.ToListAsync();
+                List<OrderGet> result = new();
+                if (numbers == true)
+                    result = await db.orderGets
+                        .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.region, o.postcode, o.country, o.phone,
+                                      o.mobile, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
+                                      c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
+                                      o.amount_owning, o.donation, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no
+                                      FROM orders o
+                                      LEFT JOIN ceremonies c
+                                      ON o.ceremony_id = c.id
+                                      WHERE o.reference_no is not null
+                                      ORDER BY o.reference_no DESC")
+                        .ToListAsync();
+                else
+                    result = await db.orderGets
+                        .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.region, o.postcode, o.country, o.phone,
+                                      o.mobile, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
+                                      c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
+                                      o.amount_owning, o.donation, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no
+                                      FROM orders o
+                                      LEFT JOIN ceremonies c
+                                      ON o.ceremony_id = c.id
+                                      ORDER BY o.reference_no DESC")
+                        .ToListAsync();
+
                 var resultList = new List<OrderDtoOut>();
 
                 foreach (var res in result)
@@ -54,6 +80,7 @@ namespace GownApi.Endpoints
                 if (order is null)
                 {
                     logger.LogInformation("order is null");
+
                     return Results.NotFound();
                 }
                 var results = await OrderMapper.ToDtoOut(order, db);

@@ -23,5 +23,6 @@
         public string? PriceCode { get; set; }
         public float? Freight { get; set; }
         public string? CollectionTime { get; set; }
+        public string? Content { get; set; }
     }
 }
