@@ -16,11 +16,11 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 //Serilog: read from appsettings.json (Serilog section)
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .CreateLogger();
+//Log.Logger = new LoggerConfiguration()
+//    .ReadFrom.Configuration(builder.Configuration)
+//    .CreateLogger();
 
-builder.Host.UseSerilog();
+//builder.Host.UseSerilog();
 
 // Email settings
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>();
@@ -173,58 +173,58 @@ app.Use(async (context, next) =>
 });
 
 //Request logging: method/path/status/elapsed + enrich extra fields
-app.UseSerilogRequestLogging(options =>
-{
-    options.GetLevel = (httpContext, elapsed, ex) =>
-    {
-        // CORS preflight 
-        if (HttpMethods.IsOptions(httpContext.Request.Method))
-            return LogEventLevel.Debug;
+//app.UseSerilogRequestLogging(options =>
+//{
+//    options.GetLevel = (httpContext, elapsed, ex) =>
+//    {
+//        // CORS preflight 
+//        if (HttpMethods.IsOptions(httpContext.Request.Method))
+//            return LogEventLevel.Debug;
 
-        if (ex != null)
-            return LogEventLevel.Error;
+//        if (ex != null)
+//            return LogEventLevel.Error;
 
-        return LogEventLevel.Information;
-    };
+//        return LogEventLevel.Information;
+//    };
 
-    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-    {
-        diagnosticContext.Set("CorrelationId", httpContext.Response.Headers["X-Correlation-ID"].ToString());
-        diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
-        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+//    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+//    {
+//        diagnosticContext.Set("CorrelationId", httpContext.Response.Headers["X-Correlation-ID"].ToString());
+//        diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
+//        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
 
-        string? orderNo = null;
+//        string? orderNo = null;
 
-        // Try to get OrderNo for request log line
-        if (httpContext.Items.TryGetValue("OrderNo", out var ordObj)
-            && ordObj is string ord
-            && !string.IsNullOrWhiteSpace(ord))
-        {
-            orderNo = ord;
-        }
-        else
-        {
-            // Fallbacks (optional)
-            var ordHeader = httpContext.Request.Headers["X-Order-No"].FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(ordHeader))
-            {
-                orderNo = ordHeader;
-            }
-            else
-            {
-                var ordQuery = httpContext.Request.Query["orderNo"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(ordQuery))
-                {
-                    orderNo = ordQuery;
-                }
-            }
-        }
+//        // Try to get OrderNo for request log line
+//        if (httpContext.Items.TryGetValue("OrderNo", out var ordObj)
+//            && ordObj is string ord
+//            && !string.IsNullOrWhiteSpace(ord))
+//        {
+//            orderNo = ord;
+//        }
+//        else
+//        {
+//            // Fallbacks (optional)
+//            var ordHeader = httpContext.Request.Headers["X-Order-No"].FirstOrDefault();
+//            if (!string.IsNullOrWhiteSpace(ordHeader))
+//            {
+//                orderNo = ordHeader;
+//            }
+//            else
+//            {
+//                var ordQuery = httpContext.Request.Query["orderNo"].FirstOrDefault();
+//                if (!string.IsNullOrWhiteSpace(ordQuery))
+//                {
+//                    orderNo = ordQuery;
+//                }
+//            }
+//        }
 
-        // Always set both, so template can decide whether to show the bracket part
-        diagnosticContext.Set("OrderNo", orderNo ?? "");
-        diagnosticContext.Set("OrderTag", string.IsNullOrWhiteSpace(orderNo) ? "" : $" (Order:{orderNo})");
-    };
-});
+//        // Always set both, so template can decide whether to show the bracket part
+//        diagnosticContext.Set("OrderNo", orderNo ?? "");
+//        diagnosticContext.Set("OrderTag", string.IsNullOrWhiteSpace(orderNo) ? "" : $" (Order:{orderNo})");
+//    };
+//});
 
 app.UseAuthentication();
 app.UseAuthorization();
