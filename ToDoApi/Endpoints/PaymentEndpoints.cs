@@ -111,10 +111,10 @@ namespace GownApi.Endpoints
             });
 
             app.MapPost("/notify", async (
-                HttpRequest req,
-                IConfiguration config,
-                GownDb db,
-                ILogger<Program> logger) =>
+    HttpRequest req,
+    IConfiguration config,
+    GownDb db,
+    ILogger<Program> logger) =>
             {
                 req.EnableBuffering();
 
@@ -124,6 +124,11 @@ namespace GownApi.Endpoints
                     raw = await reader.ReadToEndAsync();
                     req.Body.Position = 0;
                 }
+
+
+                logger.LogInformation("Paystation notify raw XML. Length={Len}, BodySnippet={BodySnippet}",
+                    raw?.Length ?? 0,
+                    SafeSnippet(raw, 6000));
 
                 XDocument doc;
                 try
@@ -138,6 +143,8 @@ namespace GownApi.Endpoints
                         req.HttpContext.Connection.RemoteIpAddress?.ToString(),
                         SafeSnippet(raw, 600));
 
+
+                    logger.LogInformation("Paystation notify response: {Resp}", "INVALID_XML");
                     return Results.Ok("INVALID_XML");
                 }
 
@@ -155,7 +162,6 @@ namespace GownApi.Endpoints
 
                 var orderTag = string.IsNullOrWhiteSpace(orderNo) ? "" : $" (Order:{orderNo})";
 
-                
                 if (!string.IsNullOrWhiteSpace(orderNo))
                 {
                     req.HttpContext.Items["OrderNo"] = orderNo;
@@ -190,6 +196,8 @@ namespace GownApi.Endpoints
                     if (string.IsNullOrWhiteSpace(merchantSession))
                     {
                         logger.LogWarning("Paystation notify missing MerchantSession. BodySnippet={BodySnippet}", SafeSnippet(raw, 600));
+
+                        logger.LogInformation("Paystation notify response: {Resp}", "NO_MERCHANT_SESSION");
                         return Results.Ok("NO_MERCHANT_SESSION");
                     }
 
@@ -199,6 +207,8 @@ namespace GownApi.Endpoints
                     if (order == null)
                     {
                         logger.LogWarning("No order found by ReferenceNo(MerchantSession)={MerchantSession}", merchantSession);
+
+                        logger.LogInformation("Paystation notify response: {Resp}", "NO_ORDER_BY_REFERENCE");
                         return Results.Ok("NO_ORDER_BY_REFERENCE");
                     }
 
@@ -222,17 +232,20 @@ namespace GownApi.Endpoints
                         catch (Exception ex)
                         {
                             logger.LogError(ex, "Failed to save payment status to DB.");
+
+                            logger.LogInformation("Paystation notify response: {Resp}", "DB_SAVE_FAILED");
                             return Results.Ok("DB_SAVE_FAILED");
                         }
 
                         if (ec != 0)
                         {
                             logger.LogWarning("Payment failed (ec!=0). Updated order as unpaid. ec={EC}, em={EM}", ec, em);
+
+                            logger.LogInformation("Paystation notify response: {Resp}", "PAYMENT_FAILED_UPDATED");
                             return Results.Ok("PAYMENT_FAILED_UPDATED");
                         }
 
-                       
-
+                        // ====== Build email receipt ======
                         string eventTitle = "";
                         string ceremonyDate = "";
                         string collectionTime = "";
@@ -305,6 +318,8 @@ namespace GownApi.Endpoints
                         if (template == null)
                         {
                             logger.LogWarning("Email template not found. TemplateName=PaymentCompleted");
+
+                            logger.LogInformation("Paystation notify response: {Resp}", "NO_TEMPLATE");
                             return Results.Ok("NO_TEMPLATE");
                         }
 
@@ -376,11 +391,14 @@ namespace GownApi.Endpoints
                             logger.LogInformation("Payment success + email sent. Total={Total}, AmountPaid={AmountPaid}, Balance={Balance}",
                                 total, amountPaid, balance);
 
+                            logger.LogInformation("Paystation notify response: {Resp}", "OK");
                             return Results.Ok("OK");
                         }
                         catch (Exception ex)
                         {
                             logger.LogError(ex, "Payment success but email sending failed.");
+
+                            logger.LogInformation("Paystation notify response: {Resp}", "EMAIL_FAILED");
                             return Results.Ok("EMAIL_FAILED");
                         }
                     }
