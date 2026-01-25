@@ -2,7 +2,6 @@
 using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Net;
@@ -15,9 +14,7 @@ namespace GownApi.Endpoints
 {
     public static class PaymentEndpoints
     {
-        const string PaystationInitiationUrl = "https://www.paystation.co.nz/direct/paystation.dll";
-        const string MerchantId = "617970";
-        const string GatewayId = "DEVELOPMENT";
+        private const string PaystationInitiationUrl = "https://www.paystation.co.nz/direct/paystation.dll";
 
         record PaymentRequest(int Amount, string OrderNumber);
 
@@ -26,33 +23,98 @@ namespace GownApi.Endpoints
             app.MapPost("/api/payment/create-payment", async (
                 PaymentRequest request,
                 IHttpClientFactory httpClientFactory,
-                ILogger<Program> logger) =>
+                IConfiguration config,
+                ILogger<Program> logger,
+                HttpContext httpContext) =>
             {
-                logger.LogInformation("Request amount {0}, Request order number {1}", request.Amount.ToString(), request.OrderNumber);
-
-                var httpClient = httpClientFactory.CreateClient();
-                var values = new Dictionary<string, string>
+                if (request.Amount <= 0 || string.IsNullOrWhiteSpace(request.OrderNumber))
                 {
-                    { "paystation", "_empty" },
-                    { "pstn_pi", MerchantId },
-                    { "pstn_gi", GatewayId },
-                    { "pstn_am", request.Amount.ToString() },
-                    //{ "pstn_ms", Guid.NewGuid().ToString() },
-                    { "pstn_ms", request.OrderNumber },
-                    { "pstn_nr", "t" }
-                };
+                    logger.LogWarning("Invalid create-payment request. AmountCents={AmountCents}, OrderNo={OrderNo}",
+                        request.Amount, request.OrderNumber);
+                    return Results.BadRequest("Invalid payment request.");
+                }
 
-                var response = await httpClient.PostAsync(
-                    PaystationInitiationUrl,
-                    new FormUrlEncodedContent(values)
-                );
+                var paystationId = config["Paystation:PaystationId"] ?? config["Paystation:ClientId"];
+                var gatewayId = config["Paystation:GatewayId"];
 
-                var responseString = await response.Content.ReadAsStringAsync();
-                return Results.Ok(new { redirectUrl = ExtractRedirectUrl(responseString) });
+                if (string.IsNullOrWhiteSpace(paystationId) || string.IsNullOrWhiteSpace(gatewayId))
+                {
+                    logger.LogError("Paystation config missing. PaystationId/GatewayId not set.");
+                    return Results.Problem("Paystation config missing.");
+                }
+
+                var orderNo = request.OrderNumber.Trim();
+                var merchantSession = orderNo;
+
+                var orderTag = string.IsNullOrWhiteSpace(orderNo) ? "" : $" (Order:{orderNo})";
+
+                
+                httpContext.Items["OrderNo"] = orderNo;
+
+              
+                using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo))
+                using (Serilog.Context.LogContext.PushProperty("OrderTag", orderTag))
+                using (Serilog.Context.LogContext.PushProperty("MerchantSession", merchantSession))
+                using (Serilog.Context.LogContext.PushProperty("AmountCents", request.Amount))
+                using (logger.BeginScope(new Dictionary<string, object?>
+                {
+                    ["OrderNo"] = orderNo,
+                    ["OrderTag"] = orderTag,
+                    ["MerchantSession"] = merchantSession,
+                    ["AmountCents"] = request.Amount
+                }))
+                {
+                    logger.LogInformation("Paystation init start. PaystationId={PaystationId}, GatewayId={GatewayId}",
+                        paystationId, gatewayId);
+
+                    try
+                    {
+                        var httpClient = httpClientFactory.CreateClient();
+
+                        var values = new Dictionary<string, string>
+                        {
+                            { "paystation", "_empty" },
+                            { "pstn_pi", paystationId },
+                            { "pstn_gi", gatewayId },
+                            { "pstn_am", request.Amount.ToString(CultureInfo.InvariantCulture) },
+                            { "pstn_ms", merchantSession },
+                            { "pstn_nr", "t" }
+                        };
+
+                        var response = await httpClient.PostAsync(
+                            PaystationInitiationUrl,
+                            new FormUrlEncodedContent(values)
+                        );
+
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        var redirectUrl = ExtractRedirectUrl(responseString);
+
+                        if (!response.IsSuccessStatusCode || string.IsNullOrWhiteSpace(redirectUrl))
+                        {
+                            logger.LogWarning("Paystation init failed. StatusCode={StatusCode}, RedirectUrlEmpty={RedirectEmpty}, BodySnippet={BodySnippet}",
+                                (int)response.StatusCode,
+                                string.IsNullOrWhiteSpace(redirectUrl),
+                                SafeSnippet(responseString, 400));
+
+                            return Results.Problem("Failed to initiate payment.");
+                        }
+
+                        logger.LogInformation("Paystation init success. RedirectUrl={RedirectUrl}", redirectUrl);
+                        return Results.Ok(new { redirectUrl });
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Paystation init exception.");
+                        return Results.Problem("Failed to initiate payment.");
+                    }
+                }
             });
 
-            //Get response from Paystation notify
-            app.MapPost("/notify", async (HttpRequest req, IConfiguration config, GownDb db) =>
+            app.MapPost("/notify", async (
+    HttpRequest req,
+    IConfiguration config,
+    GownDb db,
+    ILogger<Program> logger) =>
             {
                 req.EnableBuffering();
 
@@ -63,30 +125,26 @@ namespace GownApi.Endpoints
                     req.Body.Position = 0;
                 }
 
-                Console.WriteLine("=================================================");
-                Console.WriteLine("Paystation notify received");
-                Console.WriteLine($"Time (UTC): {DateTime.UtcNow:O}");
-                Console.WriteLine($"Remote IP: {req.HttpContext.Connection.RemoteIpAddress}");
-                Console.WriteLine($"Content-Type: {req.ContentType}");
-                Console.WriteLine("-------------------------------------------------");
-                Console.WriteLine("Headers:");
-                foreach (var h in req.Headers)
-                {
-                    Console.WriteLine($"{h.Key}: {h.Value}");
-                }
-                Console.WriteLine("-------------------------------------------------");
-                Console.WriteLine("Raw XML:");
-                Console.WriteLine(raw);
-                Console.WriteLine("-------------------------------------------------");
+
+                logger.LogInformation("Paystation notify raw XML. Length={Len}, BodySnippet={BodySnippet}",
+                    raw?.Length ?? 0,
+                    SafeSnippet(raw, 6000));
 
                 XDocument doc;
                 try
                 {
                     doc = XDocument.Parse(raw);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Console.WriteLine("Invalid XML");
+                    logger.LogWarning(ex,
+                        "Paystation notify invalid XML. ContentType={ContentType}, RemoteIP={RemoteIP}, BodySnippet={BodySnippet}",
+                        req.ContentType,
+                        req.HttpContext.Connection.RemoteIpAddress?.ToString(),
+                        SafeSnippet(raw, 600));
+
+
+                    logger.LogInformation("Paystation notify response: {Resp}", "INVALID_XML");
                     return Results.Ok("INVALID_XML");
                 }
 
@@ -94,99 +152,153 @@ namespace GownApi.Endpoints
 
                 int ec = int.TryParse(Get("ec"), out var ecVal) ? ecVal : -1;
                 var em = Get("em");
+
                 var txnId = Get("PaystationTransactionID")
                             ?? Get("TransactionID")
                             ?? Get("ti");
-                var merchantSession = Get("MerchantSession");
+
+                var merchantSession = Get("MerchantSession")?.Trim();
+                var orderNo = merchantSession;
+
+                var orderTag = string.IsNullOrWhiteSpace(orderNo) ? "" : $" (Order:{orderNo})";
+
+                if (!string.IsNullOrWhiteSpace(orderNo))
+                {
+                    req.HttpContext.Items["OrderNo"] = orderNo;
+                }
+
                 var txnTime = Get("TransactionTime") ?? Get("DigitalReceiptTime");
-                var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var c) ? c : 0;
+                var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var cents) ? cents : 0;
                 var purchaseAmount = purchaseAmountCents / 100m;
                 var receiptNumber = Get("ReturnReceiptNumber");
 
-                Console.WriteLine("Parsed fields:");
-                Console.WriteLine($"ec: {ec}");
-                Console.WriteLine($"em: {em}");
-                Console.WriteLine($"txnId: {txnId}");
-                Console.WriteLine($"merchantSession: {merchantSession}");
-                Console.WriteLine($"txnTime: {txnTime}");
-                Console.WriteLine($"purchaseAmount: {purchaseAmount:0.00}");
-                Console.WriteLine($"ReturnReceiptNumber: {receiptNumber}");
-                Console.WriteLine("=================================================");
-
-                if (ec != 0)
+                using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo ?? ""))
+                using (Serilog.Context.LogContext.PushProperty("OrderTag", orderTag))
+                using (Serilog.Context.LogContext.PushProperty("MerchantSession", merchantSession ?? ""))
+                using (Serilog.Context.LogContext.PushProperty("PaystationTxnId", txnId ?? ""))
+                using (Serilog.Context.LogContext.PushProperty("PaystationEC", ec))
+                using (Serilog.Context.LogContext.PushProperty("AmountCents", purchaseAmountCents))
+                using (Serilog.Context.LogContext.PushProperty("ReceiptNo", receiptNumber ?? ""))
+                using (logger.BeginScope(new Dictionary<string, object?>
                 {
-                    return Results.Ok("IGNORED");
-                }
-
-                var order = await db.orders
-                    .OrderByDescending(o => o.Id)
-                    .FirstOrDefaultAsync();
-
-                if (order == null)
+                    ["OrderNo"] = orderNo ?? "",
+                    ["OrderTag"] = orderTag,
+                    ["MerchantSession"] = merchantSession ?? "",
+                    ["PaystationTxnId"] = txnId ?? "",
+                    ["PaystationEC"] = ec,
+                    ["AmountCents"] = purchaseAmountCents,
+                    ["ReceiptNo"] = receiptNumber ?? ""
+                }))
                 {
-                    return Results.Ok("NO_ORDER");
-                }
+                    logger.LogInformation("Paystation notify received. ec={EC}, em={EM}, txnTime={TxnTime}, amount={Amount}, receipt={Receipt}",
+                        ec, em, txnTime, purchaseAmount, receiptNumber);
 
-                var OrderNumber = !string.IsNullOrWhiteSpace(receiptNumber)
-                    ? $"ORD{receiptNumber}"
-                    : $"ORD{order.Id}";
-
-                string eventTitle = "";
-                string ceremonyDate = "";
-                string collectionTime = "";
-
-                if (order.CeremonyId.HasValue)
-                {
-                    var ceremony = await db.ceremonies
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(ca => ca.Id == order.CeremonyId.Value);
-
-                    if (ceremony != null)
+                    if (string.IsNullOrWhiteSpace(merchantSession))
                     {
-                        if (!string.IsNullOrWhiteSpace(ceremony.Name))
-                        {
-                            eventTitle = ceremony.Name;
-                        }
+                        logger.LogWarning("Paystation notify missing MerchantSession. BodySnippet={BodySnippet}", SafeSnippet(raw, 600));
 
-                        if (ceremony.CeremonyDate != null)
-                        {
-                            ceremonyDate = ceremony.CeremonyDate.Value
-                                .ToString("dd MMMM yyyy", CultureInfo.InvariantCulture);
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(ceremony.CollectionTime))
-                        {
-                            collectionTime = ceremony.CollectionTime.Trim();
-                        }
+                        logger.LogInformation("Paystation notify response: {Resp}", "NO_MERCHANT_SESSION");
+                        return Results.Ok("NO_MERCHANT_SESSION");
                     }
-                }
 
-                var orderedItems = await db.orderedItems
-                    .Where(o => o.OrderId == order.Id)
-                    .ToListAsync();
+                    var order = await db.orders
+                        .FirstOrDefaultAsync(o => o.ReferenceNo == merchantSession);
 
-                var skuIds = orderedItems.Select(o => o.SkuId).Distinct().ToList();
-                var skus = await db.Sku.Where(s => skuIds.Contains(s.Id)).ToListAsync();
-                var itemIds = skus.Select(s => s.ItemId).Distinct().ToList();
-                var items = await db.items.Where(i => itemIds.Contains(i.Id)).ToListAsync();
+                    if (order == null)
+                    {
+                        logger.LogWarning("No order found by ReferenceNo(MerchantSession)={MerchantSession}", merchantSession);
 
-                decimal total = 0m;
-                var sbRows = new StringBuilder();
+                        logger.LogInformation("Paystation notify response: {Resp}", "NO_ORDER_BY_REFERENCE");
+                        return Results.Ok("NO_ORDER_BY_REFERENCE");
+                    }
 
-                foreach (var oi in orderedItems)
-                {
-                    var sku = skus.FirstOrDefault(s => s.Id == oi.SkuId);
-                    var item = sku != null ? items.FirstOrDefault(i => i.Id == sku.ItemId) : null;
+                    using (Serilog.Context.LogContext.PushProperty("OrderId", order.Id))
+                    using (logger.BeginScope(new Dictionary<string, object?>
+                    {
+                        ["OrderId"] = order.Id
+                    }))
+                    {
+                        order.Paid = (ec == 0);
 
-                    var name = WebUtility.HtmlEncode(item?.Name ?? $"Item {oi.SkuId}");
-                    var qty = oi.Quantity;
-                    var price = (decimal)oi.Cost;
-                    var gst = Math.Round(price * 0.15m * qty, 2);
-                    var lineTotal = price * qty;
+                        if (purchaseAmountCents > 0)
+                        {
+                            order.AmountPaid = (float)(purchaseAmountCents / 100m);
+                        }
 
-                    total += lineTotal;
+                        try
+                        {
+                            await db.SaveChangesAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, "Failed to save payment status to DB.");
 
-                    sbRows.AppendLine($@"
+                            logger.LogInformation("Paystation notify response: {Resp}", "DB_SAVE_FAILED");
+                            return Results.Ok("DB_SAVE_FAILED");
+                        }
+
+                        if (ec != 0)
+                        {
+                            logger.LogWarning("Payment failed (ec!=0). Updated order as unpaid. ec={EC}, em={EM}", ec, em);
+
+                            logger.LogInformation("Paystation notify response: {Resp}", "PAYMENT_FAILED_UPDATED");
+                            return Results.Ok("PAYMENT_FAILED_UPDATED");
+                        }
+
+                        // ====== Build email receipt ======
+                        string eventTitle = "";
+                        string ceremonyDate = "";
+                        string collectionTime = "";
+
+                        if (order.CeremonyId.HasValue)
+                        {
+                            var ceremony = await db.ceremonies
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(ca => ca.Id == order.CeremonyId.Value);
+
+                            if (ceremony != null)
+                            {
+                                eventTitle = ceremony.Name ?? "";
+
+                                if (ceremony.CeremonyDate != null)
+                                {
+                                    ceremonyDate = ceremony.CeremonyDate.Value
+                                        .ToString("dd MMMM yyyy", CultureInfo.InvariantCulture);
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(ceremony.CollectionTime))
+                                {
+                                    collectionTime = ceremony.CollectionTime.Trim();
+                                }
+                            }
+                        }
+
+                        var orderedItems = await db.orderedItems
+                            .Where(o => o.OrderId == order.Id)
+                            .ToListAsync();
+
+                        var skuIds = orderedItems.Select(o => o.SkuId).Distinct().ToList();
+                        var skus = await db.Sku.Where(s => skuIds.Contains(s.Id)).ToListAsync();
+                        var itemIds = skus.Select(s => s.ItemId).Distinct().ToList();
+                        var items = await db.items.Where(i => itemIds.Contains(i.Id)).ToListAsync();
+
+                        decimal total = 0m;
+                        var sbRows = new StringBuilder();
+
+                        foreach (var oi in orderedItems)
+                        {
+                            var sku = skus.FirstOrDefault(s => s.Id == oi.SkuId);
+                            var item = sku != null ? items.FirstOrDefault(i => i.Id == sku.ItemId) : null;
+
+                            var name = WebUtility.HtmlEncode(item?.Name ?? $"Item {oi.SkuId}");
+                            var qty = oi.Quantity;
+                            var price = (decimal)oi.Cost;
+                            var gst = Math.Round(price * 0.15m * qty, 2);
+                            var lineTotal = price * qty;
+
+                            total += lineTotal;
+
+                            sbRows.AppendLine($@"
 <tr>
   <td align=""left"">{name}</td>
   <td align=""center"">{qty}</td>
@@ -194,55 +306,56 @@ namespace GownApi.Endpoints
   <td align=""right"">{gst:0.00}</td>
   <td align=""right"">{lineTotal:0.00}</td>
 </tr>");
-                }
+                        }
 
-                var amountPaid = purchaseAmount == 0 ? total : purchaseAmount;
-                var balance = Math.Max(0, total - amountPaid);
+                        var amountPaid = purchaseAmount == 0 ? total : purchaseAmount;
+                        var balance = Math.Max(0, total - amountPaid);
 
-                var template = await db.EmailTemplates
-                    .AsNoTracking()
-                    .SingleOrDefaultAsync(t => t.Name == "PaymentCompleted");
+                        var template = await db.EmailTemplates
+                            .AsNoTracking()
+                            .SingleOrDefaultAsync(t => t.Name == "PaymentCompleted");
 
-                if (template == null)
-                {
-                    return Results.Ok("NO_TEMPLATE");
-                }
+                        if (template == null)
+                        {
+                            logger.LogWarning("Email template not found. TemplateName=PaymentCompleted");
 
-                var OrderDate = order.OrderDate
-                    .ToDateTime(TimeOnly.MinValue)
-                    .ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+                            logger.LogInformation("Paystation notify response: {Resp}", "NO_TEMPLATE");
+                            return Results.Ok("NO_TEMPLATE");
+                        }
 
-                var values = new Dictionary<string, string?>
-                {
-                    ["OrderNumber"] = OrderNumber,
-                    ["OrderDate"] = OrderDate,
-                    ["FirstName"] = order.FirstName ?? "",
-                    ["LastName"] = order.LastName ?? "",
-                    ["Address"] = order.Address ?? "",
-                    ["City"] = order.City ?? "",
-                    ["Postcode"] = order.Postcode ?? "",
-                    ["Country"] = order.Country ?? "",
-                    ["StudentId"] = order.StudentId.ToString(),
-                    ["Email"] = order.Email ?? "",
-                    ["Total"] = total.ToString("0.00"),
-                    ["AmountPaid"] = amountPaid.ToString("0.00"),
-                    ["BalanceOwing"] = balance.ToString("0.00"),
-                    ["EventTitle"] = eventTitle,
-                    ["CeremonyDate"] = ceremonyDate
-                };
+                        var orderDate = order.OrderDate
+                            .ToDateTime(TimeOnly.MinValue)
+                            .ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
 
-                var subject = ApplyTemplate(template.SubjectTemplate, values);
-                var bodyTop = ApplyTemplate(template.BodyHtml, values);
+                        var values = new Dictionary<string, string?>
+                        {
+                            ["OrderNumber"] = orderNo ?? "",
+                            ["OrderDate"] = orderDate,
+                            ["FirstName"] = order.FirstName ?? "",
+                            ["LastName"] = order.LastName ?? "",
+                            ["Address"] = order.Address ?? "",
+                            ["City"] = order.City ?? "",
+                            ["Postcode"] = order.Postcode ?? "",
+                            ["Country"] = order.Country ?? "",
+                            ["StudentId"] = order.StudentId.ToString(),
+                            ["Email"] = order.Email ?? "",
+                            ["Total"] = total.ToString("0.00"),
+                            ["AmountPaid"] = amountPaid.ToString("0.00"),
+                            ["BalanceOwing"] = balance.ToString("0.00"),
+                            ["EventTitle"] = eventTitle,
+                            ["CeremonyDate"] = ceremonyDate
+                        };
 
-                var receiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
+                        var subject = ApplyTemplate(template.SubjectTemplate, values);
+                        var bodyTop = ApplyTemplate(template.BodyHtml, values);
 
-                receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
+                        var receiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
+                        receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
+                        receiptHtml = InjectCartRowsIntoCartTable(receiptHtml, sbRows.ToString());
 
-                receiptHtml = InjectCartRowsIntoCartTable(receiptHtml, sbRows.ToString());
+                        var receiptInner = ExtractBodyInnerHtml(receiptHtml);
 
-                var receiptInner = ExtractBodyInnerHtml(receiptHtml);
-
-                var finalBody = $@"
+                        var finalBody = $@"
 <!DOCTYPE html>
 <html>
   <body style=""margin:0;padding:0;"">
@@ -252,27 +365,44 @@ namespace GownApi.Endpoints
   </body>
 </html>";
 
-                using var client = new SmtpClient(
-                    config["Smtp:Host"]!,
-                    int.Parse(config["Smtp:Port"] ?? "587"))
-                {
-                    EnableSsl = true,
-                    Credentials = new NetworkCredential(
-                        config["Smtp:Username"],
-                        config["Smtp:Password"])
-                };
+                        try
+                        {
+                            using var client = new SmtpClient(
+                                config["Smtp:Host"]!,
+                                int.Parse(config["Smtp:Port"] ?? "587"))
+                            {
+                                EnableSsl = true,
+                                Credentials = new NetworkCredential(
+                                    config["Smtp:Username"],
+                                    config["Smtp:Password"])
+                            };
 
-                var mail = new MailMessage(
-                    config["Email:From"]!,
-                    config["Email:To"]!)
-                {
-                    Subject = subject,
-                    Body = finalBody,
-                    IsBodyHtml = true
-                };
+                            var mail = new MailMessage(
+                                config["Email:From"]!,
+                                config["Email:To"]!)
+                            {
+                                Subject = subject,
+                                Body = finalBody,
+                                IsBodyHtml = true
+                            };
 
-                await client.SendMailAsync(mail);
-                return Results.Ok("OK");
+                            await client.SendMailAsync(mail);
+
+                            logger.LogInformation("Payment success + email sent. Total={Total}, AmountPaid={AmountPaid}, Balance={Balance}",
+                                total, amountPaid, balance);
+
+                            logger.LogInformation("Paystation notify response: {Resp}", "OK");
+                            return Results.Ok("OK");
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, "Payment success but email sending failed.");
+
+                            logger.LogInformation("Paystation notify response: {Resp}", "EMAIL_FAILED");
+                            return Results.Ok("EMAIL_FAILED");
+                        }
+                    }
+                }
             });
         }
 
@@ -317,10 +447,9 @@ namespace GownApi.Endpoints
             if (string.IsNullOrWhiteSpace(collectionTime)) return html;
 
             var safe = WebUtility.HtmlEncode(collectionTime.Trim())
-    .Replace("\r\n", "<br>")
-    .Replace("\n", "<br>")
-    .Replace("\r", "<br>");
-
+                .Replace("\r\n", "<br>")
+                .Replace("\n", "<br>")
+                .Replace("\r", "<br>");
 
             html = Regex.Replace(
                 html,
@@ -371,6 +500,13 @@ namespace GownApi.Endpoints
             return s >= 0 && e > s
                 ? xml.Substring(s + 14, e - s - 14)
                 : "";
+        }
+
+        private static string SafeSnippet(string? text, int maxLen)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            text = text.Replace("\r", " ").Replace("\n", " ");
+            return text.Length <= maxLen ? text : text[..maxLen] + "...";
         }
     }
 }

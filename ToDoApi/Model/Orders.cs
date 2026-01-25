@@ -15,7 +15,7 @@
         public string Mobile { get; set; }
         public int StudentId { get; set; }
         public string? Message { get; set; }
-        public bool? Paid { get; set; }
+        public bool? Paid { get; set; } 
         public int? PaymentMethod { get; set; }
         public string? PurchaseOrder { get; set; }
         public DateOnly OrderDate { get; set; }
