@@ -102,5 +102,49 @@ namespace GownApi.Services
             };
         }
 
+        public static Task<OrderDtoOut> ToDtoOut(Orders order, GownDb db)
+        {
+            if (order == null) return Task.FromResult<OrderDtoOut>(null);
+
+            
+            var og = new OrderGet
+            {
+                Id = order.Id,
+                FirstName = order.FirstName,
+                LastName = order.LastName,
+                Email = order.Email,
+                Address = order.Address,
+                City = order.City,
+                Region = order.Region,
+                Postcode = order.Postcode,
+                Country = order.Country,
+                Phone = order.Phone,
+                Mobile = order.Mobile,
+                StudentId = order.StudentId,
+                Message = order.Message,
+                Paid = order.Paid,
+                PaymentMethod = order.PaymentMethod,
+                PurchaseOrder = order.PurchaseOrder,
+                OrderDate = order.OrderDate,
+                CeremonyId = order.CeremonyId,
+                Ceremony = null,          
+                DegreeId = order.DegreeId,
+                OrderType = order.OrderType,
+                Note = order.Note,
+                Changes = order.Changes,
+                AmountPaid = order.AmountPaid,
+                AmountOwning = order.AmountOwning,
+                Donation = order.Donation,
+                Freight = order.Freight,
+                Refund = order.Refund,
+                AdminCharges = order.AdminCharges,
+                PayBy = order.PayBy,
+                Status = order.Status,
+                ReferenceNo = order.ReferenceNo
+            };
+
+            return ToDtoOut(og, db);
+        }
+
     }
 }
