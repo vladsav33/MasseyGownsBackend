@@ -14,7 +14,7 @@
         public string Mobile { get; set; }
         public int StudentId { get; set; }
         public string? Message { get; set; }
-        public bool? Paid { get; set; }
+        public bool? Paid { get; set; } 
         public int? PaymentMethod { get; set; }
         public string? PurchaseOrder { get; set; }
         public DateOnly OrderDate { get; set; }
@@ -31,7 +31,7 @@
         public float? Refund { get; set; }
         public float? AdminCharges { get; set; }
         public DateOnly? PayBy { get; set; }
-        public string? Status { get; set; }
+        public int? Status { get; set; }
         public string? ReferenceNo { get; set; }
     }
 }
