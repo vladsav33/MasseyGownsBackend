@@ -672,10 +672,53 @@ namespace GownApi.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("ShortName")
+                        .HasColumnType("text")
+                        .HasColumnName("short_name");
+
                     b.HasKey("Id")
                         .HasName("pk_hood_type");
 
                     b.ToTable("hood_type", (string)null);
+                });
+
+            modelBuilder.Entity("GownApi.Model.ItemDetails", b =>
+                {
+                    b.Property<int>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("id"));
+
+                    b.Property<string>("FirstName")
+                        .HasColumnType("text")
+                        .HasColumnName("first_name");
+
+                    b.Property<string>("GownSize")
+                        .HasColumnType("text")
+                        .HasColumnName("gown_size");
+
+                    b.Property<string>("HatSize")
+                        .HasColumnType("text")
+                        .HasColumnName("hat_size");
+
+                    b.Property<string>("HoodName")
+                        .HasColumnType("text")
+                        .HasColumnName("hood_name");
+
+                    b.Property<string>("LastName")
+                        .HasColumnType("text")
+                        .HasColumnName("last_name");
+
+                    b.Property<string>("StoleSize")
+                        .HasColumnType("text")
+                        .HasColumnName("stole_size");
+
+                    b.HasKey("id")
+                        .HasName("pk_item_details");
+
+                    b.ToTable("item_details", (string)null);
                 });
 
             modelBuilder.Entity("GownApi.Model.Items", b =>
@@ -716,10 +759,166 @@ namespace GownApi.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("picture");
 
+                    b.Property<string>("Type")
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
                     b.HasKey("Id")
                         .HasName("pk_items");
 
                     b.ToTable("items", (string)null);
+                });
+
+            modelBuilder.Entity("GownApi.Model.OrderGet", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<float?>("AdminCharges")
+                        .HasColumnType("real")
+                        .HasColumnName("admin_charges");
+
+                    b.Property<float?>("AmountOwning")
+                        .HasColumnType("real")
+                        .HasColumnName("amount_owning");
+
+                    b.Property<float?>("AmountPaid")
+                        .HasColumnType("real")
+                        .HasColumnName("amount_paid");
+
+                    b.Property<string>("Ceremony")
+                        .HasColumnType("text")
+                        .HasColumnName("ceremony");
+
+                    b.Property<int?>("CeremonyId")
+                        .HasColumnType("integer")
+                        .HasColumnName("ceremony_id");
+
+                    b.Property<string>("Changes")
+                        .HasColumnType("text")
+                        .HasColumnName("changes");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("city");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("country");
+
+                    b.Property<int?>("DegreeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("degree_id");
+
+                    b.Property<float?>("Donation")
+                        .HasColumnType("real")
+                        .HasColumnName("donation");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("first_name");
+
+                    b.Property<float?>("Freight")
+                        .HasColumnType("real")
+                        .HasColumnName("freight");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("last_name");
+
+                    b.Property<string>("Message")
+                        .HasColumnType("text")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Mobile")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("mobile");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<DateOnly>("OrderDate")
+                        .HasColumnType("date")
+                        .HasColumnName("order_date");
+
+                    b.Property<string>("OrderType")
+                        .HasColumnType("text")
+                        .HasColumnName("order_type");
+
+                    b.Property<string>("PackNote")
+                        .HasColumnType("text")
+                        .HasColumnName("pack_note");
+
+                    b.Property<bool?>("Paid")
+                        .HasColumnType("boolean")
+                        .HasColumnName("paid");
+
+                    b.Property<DateOnly?>("PayBy")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_by");
+
+                    b.Property<int?>("PaymentMethod")
+                        .HasColumnType("integer")
+                        .HasColumnName("payment_method");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("Postcode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("postcode");
+
+                    b.Property<string>("PurchaseOrder")
+                        .HasColumnType("text")
+                        .HasColumnName("purchase_order");
+
+                    b.Property<string>("ReferenceNo")
+                        .HasColumnType("text")
+                        .HasColumnName("reference_no");
+
+                    b.Property<float?>("Refund")
+                        .HasColumnType("real")
+                        .HasColumnName("refund");
+
+                    b.Property<string>("Region")
+                        .HasColumnType("text")
+                        .HasColumnName("region");
+
+                    b.Property<int?>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("student_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_gets");
+
+                    b.ToTable("order_gets", (string)null);
                 });
 
             modelBuilder.Entity("GownApi.Model.OrderedItems", b =>
@@ -782,10 +981,6 @@ namespace GownApi.Migrations
                     b.Property<float?>("AmountPaid")
                         .HasColumnType("real")
                         .HasColumnName("amount_paid");
-
-                    b.Property<string>("Ceremony")
-                        .HasColumnType("text")
-                        .HasColumnName("ceremony");
 
                     b.Property<int?>("CeremonyId")
                         .HasColumnType("integer")
@@ -954,6 +1149,10 @@ namespace GownApi.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("count");
+
                     b.Property<int?>("FitId")
                         .HasColumnType("integer")
                         .HasColumnName("fit_id");
@@ -974,6 +1173,38 @@ namespace GownApi.Migrations
                         .HasName("pk_sku");
 
                     b.ToTable("sku", (string)null);
+                });
+
+            modelBuilder.Entity("GownApi.Model.SkuDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FitType")
+                        .HasColumnType("text")
+                        .HasColumnName("fit_type");
+
+                    b.Property<string>("Hood")
+                        .HasColumnType("text")
+                        .HasColumnName("hood");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Size")
+                        .HasColumnType("text")
+                        .HasColumnName("size");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sku_detail");
+
+                    b.ToTable("sku_detail", (string)null);
                 });
 
             modelBuilder.Entity("GownApi.Model.User", b =>

@@ -7,5 +7,6 @@
         public int? SizeId { get; set; }
         public int? FitId { get; set; }
         public int? HoodId { get; set; }
+        public int Count { get; set; }
     }
 }

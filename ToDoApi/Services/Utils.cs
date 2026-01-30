@@ -22,19 +22,22 @@ namespace GownApi.Services
         public static async Task<ItemDto> GetOptions(ItemDegreeModel items, GownDb db) // where T : IItemBase
         {
             var sizes = await db.sizes
-                .FromSqlRaw("SELECT s.id, s.size, s.labelsize, s.price FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
+                //.FromSqlRaw("SELECT s.id, s.size, s.labelsize, s.price FROM sizes s LEFT JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
+                .FromSqlRaw("SELECT s.id, s.size, s.labelsize, s.price FROM sizes s WHERE item_id = {0} AND (s.fit_id = 1 OR s.fit_id IS NULL)",
                     items.Id)
                 .Select(s => new { s.Id, Value = s.Size, Price = s.Price })
                 .ToListAsync();
 
             var fit = await db.fit
-                .FromSqlRaw("SELECT DISTINCT f.id, f.fit_type FROM fit f INNER JOIN sku sk ON sk.fit_id = f.id WHERE sk.item_id = {0} order by f.fit_type",
+                //.FromSqlRaw("SELECT DISTINCT f.id, f.fit_type FROM fit f INNER JOIN sku sk ON sk.fit_id = f.id WHERE sk.item_id = {0} order by f.fit_type",
+                .FromSqlRaw("SELECT DISTINCT f.id, f.fit_type FROM sizes s INNER JOIN fit f ON s.fit_id = f.id WHERE s.item_id = {0} order by f.fit_type",
                     items.Id)
                 .Select(f => new { f.Id, Value = f.FitType })
                 .ToListAsync();
 
             var hoods = await db.hoods
-                .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
+                //.FromSqlRaw("SELECT h.id, h.name, h.item_id FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
+                .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE i.id = {0}",
                     items.Id)
                 .Select(h => new { h.Id, Value = h.Name })
                 .ToListAsync();

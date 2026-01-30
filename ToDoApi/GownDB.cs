@@ -30,6 +30,7 @@ namespace GownApi
         public DbSet<Contacts> Contacts { get; set; }
         public DbSet<User> users { get; set; }
         public DbSet<Sku> Sku { get; set; }
+        public DbSet<SkuDetail> skuDetail { get; set; }
         public DbSet<CmsContentBlock> CmsContentBlocks { get; set; }
         public DbSet<EmailTemplate> EmailTemplates { get; set; } 
         public DbSet<CountBulkDto> countBulkDto { get; set; }
