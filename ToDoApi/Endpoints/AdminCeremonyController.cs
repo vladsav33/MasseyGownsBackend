@@ -16,10 +16,24 @@ namespace GownApi.Endpoints
     {
         public static void AdminCeremonyEndpoints(this WebApplication app)
         {
-
             app.MapGet("/admin/ceremonies", async (GownDb db) => {
-                return await db.ceremonies.OrderBy(c => c.Name).ToListAsync();
+                var sql = @"
+                    SELECT c.*,
+	                COUNT(bo.hat_type) AS hat_count,
+                    COUNT(bo.gown_type) AS gown_count,
+                    COUNT(bo.hood_type) AS hood_count,
+                    COUNT(bo.ucol_sash) AS ucol_count
+                    FROM ceremonies c
+                    LEFT JOIN bulk_orders bo
+                    ON c.id = bo.ceremony_id
+                    GROUP BY c.id";
 
+                var result = await db.ceremonyDetails
+                    .FromSqlRaw(sql)
+                    .OrderBy(c => c.Name)
+                    .ToListAsync();
+
+                return Results.Ok(result);
             });
 
             app.MapGet("admin/ceremonies/bulk/{id}", async (int id, GownDb db) =>

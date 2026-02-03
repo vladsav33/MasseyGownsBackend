@@ -85,7 +85,7 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/sku", async (GownDb db) =>
             {
                 var results = await db.skuDetail
-                    .FromSqlRaw(@"SELECT sk.id, i.name, s.size, f.fit_type, h.name as hood, sk.count as count FROM sku sk
+                    .FromSqlRaw(@"SELECT sk.id, i.name, s.size, s.labelsize, f.fit_type, h.name as hood, sk.count as count FROM sku sk
                                   LEFT JOIN items i
                                   ON i.id = sk.item_id
                                   LEFT JOIN sizes s
@@ -94,8 +94,8 @@ namespace GownApi.Endpoints
                                   ON f.id = sk.fit_id
                                   LEFT JOIN hood_type h
                                   ON h.id = sk.hood_id
-                                  WHERE i.category <> 'Delivery' AND i.category <> 'Set'
-                                  ORDER BY i.name, f.fit_type, s.display_order, h.name;")
+                                  WHERE i.category <> 'Delivery' AND i.category <> 'Set' AND i.category <> 'Donation'
+                                  ORDER BY i.name, f.fit_type, s.display_order, h.name")
                     .ToListAsync();
                 return Results.Ok(results);
             });

@@ -3,6 +3,7 @@ using System;
 using GownApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GownApi.Migrations
 {
     [DbContext(typeof(GownDb))]
-    partial class GownDbModelSnapshot : ModelSnapshot
+    [Migration("20260131043831_Add3CeremonyPostalFields")]
+    partial class Add3CeremonyPostalFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -286,138 +289,6 @@ namespace GownApi.Migrations
                         .HasName("pk_ceremony_degree_items");
 
                     b.ToTable("ceremony_degree_items", (string)null);
-                });
-
-            modelBuilder.Entity("GownApi.Model.CeremonyDetails", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateOnly?>("CeremonyDate")
-                        .HasColumnType("date")
-                        .HasColumnName("ceremony_date");
-
-                    b.Property<DateOnly?>("CeremonyDate2")
-                        .HasColumnType("date")
-                        .HasColumnName("ceremony_date2");
-
-                    b.Property<int?>("CerenonyNo")
-                        .HasColumnType("integer")
-                        .HasColumnName("cerenony_no");
-
-                    b.Property<string>("City")
-                        .HasColumnType("text")
-                        .HasColumnName("city");
-
-                    b.Property<string>("CollectionTime")
-                        .HasColumnType("text")
-                        .HasColumnName("collection_time");
-
-                    b.Property<string>("Content")
-                        .HasColumnType("text")
-                        .HasColumnName("content");
-
-                    b.Property<string>("CourierAddress")
-                        .HasColumnType("text")
-                        .HasColumnName("courier_address");
-
-                    b.Property<DateOnly?>("DateReturned")
-                        .HasColumnType("date")
-                        .HasColumnName("date_returned");
-
-                    b.Property<DateOnly?>("DateSent")
-                        .HasColumnType("date")
-                        .HasColumnName("date_sent");
-
-                    b.Property<DateOnly?>("DespatchDate")
-                        .HasColumnType("date")
-                        .HasColumnName("despatch_date");
-
-                    b.Property<DateOnly?>("DueDate")
-                        .HasColumnType("date")
-                        .HasColumnName("due_date");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text")
-                        .HasColumnName("email");
-
-                    b.Property<float?>("Freight")
-                        .HasColumnType("real")
-                        .HasColumnName("freight");
-
-                    b.Property<string>("IdCode")
-                        .HasColumnType("text")
-                        .HasColumnName("id_code");
-
-                    b.Property<string>("InstitutionName")
-                        .HasColumnType("text")
-                        .HasColumnName("institution_name");
-
-                    b.Property<string>("InvoiceEmail")
-                        .HasColumnType("text")
-                        .HasColumnName("invoice_email");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Organiser")
-                        .HasColumnType("text")
-                        .HasColumnName("organiser");
-
-                    b.Property<string>("Phone")
-                        .HasColumnType("text")
-                        .HasColumnName("phone");
-
-                    b.Property<string>("PostalAddress")
-                        .HasColumnType("text")
-                        .HasColumnName("postal_address");
-
-                    b.Property<string>("PostalAddress2")
-                        .HasColumnType("text")
-                        .HasColumnName("postal_address2");
-
-                    b.Property<string>("PostalAddress3")
-                        .HasColumnType("text")
-                        .HasColumnName("postal_address3");
-
-                    b.Property<string>("PriceCode")
-                        .HasColumnType("text")
-                        .HasColumnName("price_code");
-
-                    b.Property<DateOnly?>("ReturnDate")
-                        .HasColumnType("date")
-                        .HasColumnName("return_date");
-
-                    b.Property<bool>("Visible")
-                        .HasColumnType("boolean")
-                        .HasColumnName("visible");
-
-                    b.Property<int>("gown_count")
-                        .HasColumnType("integer")
-                        .HasColumnName("gown_count");
-
-                    b.Property<int>("hat_count")
-                        .HasColumnType("integer")
-                        .HasColumnName("hat_count");
-
-                    b.Property<int>("hood_count")
-                        .HasColumnType("integer")
-                        .HasColumnName("hood_count");
-
-                    b.Property<int>("ucol_count")
-                        .HasColumnType("integer")
-                        .HasColumnName("ucol_count");
-
-                    b.HasKey("Id")
-                        .HasName("pk_ceremony_details");
-
-                    b.ToTable("ceremony_details", (string)null);
                 });
 
             modelBuilder.Entity("GownApi.Model.CmsContentBlock", b =>
@@ -1169,10 +1040,6 @@ namespace GownApi.Migrations
                     b.Property<float?>("Freight")
                         .HasColumnType("real")
                         .HasColumnName("freight");
-
-                    b.Property<string>("GstNo")
-                        .HasColumnType("text")
-                        .HasColumnName("gst_no");
 
                     b.Property<string>("LastName")
                         .IsRequired()

@@ -35,5 +35,6 @@
         public DateOnly? PayBy { get; set; }
         public int? Status { get; set; }
         public string? ReferenceNo { get; set; }
+        public string? GstNo { get; set; }
     }
 }
