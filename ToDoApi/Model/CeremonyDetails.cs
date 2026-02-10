@@ -32,5 +32,10 @@
         public int hood_count { get; set; }
         public int gown_count { get; set; }
         public int ucol_count { get; set; }
+        public float? hood {get; set; }
+        public float? gown {get; set; }
+        public float? hat {get; set; }
+        public float? xtra_hood {get; set; }
+        public float? ucol_sash {get; set; }
     }
 }

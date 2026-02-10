@@ -18,7 +18,7 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/admin/ceremonies", async (GownDb db) => {
                 var sql = @"
-                    SELECT c.*,
+                    SELECT c.*, p.hood, p.gown, p.hat, p.xtra_hood, p.ucol_sash,
 	                COUNT(bo.hat_type) AS hat_count,
                     COUNT(bo.gown_type) AS gown_count,
                     COUNT(bo.hood_type) AS hood_count,
@@ -26,7 +26,10 @@ namespace GownApi.Endpoints
                     FROM ceremonies c
                     LEFT JOIN bulk_orders bo
                     ON c.id = bo.ceremony_id
-                    GROUP BY c.id";
+                    LEFT JOIN prices p
+                    ON c.price_id = p.id
+                    GROUP BY c.id, p.hood, p.gown, p.hat, p.xtra_hood, p.ucol_sash
+                    ORDER BY c.name";
 
                 var result = await db.ceremonyDetails
                     .FromSqlRaw(sql)

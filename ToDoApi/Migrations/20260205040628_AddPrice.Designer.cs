@@ -3,6 +3,7 @@ using System;
 using GownApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GownApi.Migrations
 {
     [DbContext(typeof(GownDb))]
-    partial class GownDbModelSnapshot : ModelSnapshot
+    [Migration("20260205040628_AddPrice")]
+    partial class AddPrice
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -398,25 +401,13 @@ namespace GownApi.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("visible");
 
-                    b.Property<float?>("gown")
-                        .HasColumnType("real")
-                        .HasColumnName("gown");
-
                     b.Property<int>("gown_count")
                         .HasColumnType("integer")
                         .HasColumnName("gown_count");
 
-                    b.Property<float?>("hat")
-                        .HasColumnType("real")
-                        .HasColumnName("hat");
-
                     b.Property<int>("hat_count")
                         .HasColumnType("integer")
                         .HasColumnName("hat_count");
-
-                    b.Property<float?>("hood")
-                        .HasColumnType("real")
-                        .HasColumnName("hood");
 
                     b.Property<int>("hood_count")
                         .HasColumnType("integer")
@@ -425,14 +416,6 @@ namespace GownApi.Migrations
                     b.Property<int>("ucol_count")
                         .HasColumnType("integer")
                         .HasColumnName("ucol_count");
-
-                    b.Property<float?>("ucol_sash")
-                        .HasColumnType("real")
-                        .HasColumnName("ucol_sash");
-
-                    b.Property<float?>("xtra_hood")
-                        .HasColumnType("real")
-                        .HasColumnName("xtra_hood");
 
                     b.HasKey("Id")
                         .HasName("pk_ceremony_details");
