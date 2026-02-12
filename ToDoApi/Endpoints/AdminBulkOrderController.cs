@@ -3,6 +3,7 @@ using GownApi.Model;
 using GownApi.Model.Dto;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -15,6 +16,24 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/bulkorders", async (GownDb db) =>
             {
                 return await db.bulkOrders.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ToListAsync();
+
+            });
+
+            app.MapGet("/admin/bulkorders/{id}", async (int id, GownDb db) =>
+            {
+                var sql = @"
+                    SELECT bo.id, c.id_code, bo.hood_type FROM ceremonies c
+                    INNER JOIN bulk_orders bo ON bo.ceremony_id = c.id
+                    WHERE c.id = @id";
+
+                var param = new NpgsqlParameter("@id", id);
+
+                // Execute query and map to DTO
+                var result = await db.bulkOrderLabels
+                    .FromSqlRaw(sql, param)
+                    .ToListAsync();
+
+                return Results.Ok(result);
 
             });
 

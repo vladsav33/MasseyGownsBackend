@@ -35,6 +35,7 @@ namespace GownApi
         public DbSet<CmsContentBlock> CmsContentBlocks { get; set; }
         public DbSet<EmailTemplate> EmailTemplates { get; set; } 
         public DbSet<CountBulkDto> countBulkDto { get; set; }
+        public DbSet<BulkOrderLabels> bulkOrderLabels { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
