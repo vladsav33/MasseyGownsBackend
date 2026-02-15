@@ -38,7 +38,7 @@ namespace GownApi.Endpoints
                                 FROM public.ceremony_degree_item cdi
                                 INNER JOIN public.items i on cdi.item_id = i.id
 					            INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id
-                                WHERE cdi.ceremony_degree_id = {0} ORDER BY i.category, i.name", id)
+                                WHERE cd.degree_id = {0} AND cd.graduation_id = 2 ORDER BY i.category, i.name", id)
                 .ToListAsync();
 
                 var itemsDto = new List<ItemDegreeDto>();
