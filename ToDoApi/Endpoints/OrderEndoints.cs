@@ -1,9 +1,6 @@
-﻿using DocumentFormat.OpenXml.Drawing.Charts;
-using DocumentFormat.OpenXml.VariantTypes;
-using GownApi.Model;
+﻿using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
-using Microsoft.CodeAnalysis.Elfie.Model.Tree;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Context;
 
@@ -121,9 +118,11 @@ namespace GownApi.Endpoints
 
                         if (!skuId.Any())
                         {
-                            db.Sku.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId });
-                            await db.SaveChangesAsync();
                             skuId.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId });
+                            db.Sku.Add(skuId[0]);
+                            await db.SaveChangesAsync();
+                            logger.LogInformation("Created new SKU with iD: {0}, itemId: {1}, SizeId: {2}, FitId: {3}, HoodId: {4}",
+                                skuId[0].Id, skuId[0].ItemId, skuId[0].SizeId, skuId[0].FitId, skuId[0].HoodId);
                         }
                         else
                         {
