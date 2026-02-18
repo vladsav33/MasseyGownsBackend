@@ -23,7 +23,9 @@ namespace GownApi.Services
         {
             var sizes = await db.sizes
                 //.FromSqlRaw("SELECT s.id, s.size, s.labelsize, s.price FROM sizes s LEFT JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND (sk.fit_id = 1 OR sk.fit_id IS NULL)",
-                .FromSqlRaw("SELECT s.id, s.size, s.labelsize, s.price FROM sizes s WHERE item_id = {0} AND (s.fit_id = 1 OR s.fit_id IS NULL)",
+                .FromSqlRaw(@"SELECT s.id, s.size, s.labelsize, s.price FROM sizes s
+                              WHERE item_id = {0} AND (s.fit_id = 1 OR s.fit_id IS NULL)
+                              ORDER BY s.display_order",
                     items.Id)
                 .Select(s => new { s.Id, Value = s.Size, Price = s.Price })
                 .ToListAsync();

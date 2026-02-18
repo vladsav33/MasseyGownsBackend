@@ -52,7 +52,7 @@ namespace GownApi.Services
                 return null;
 
             var items = await db.selectedItemOut
-                    .FromSqlRaw(@"SELECT oi.id, i.name as item_name, i.id as item_id, size as size_name, s.id as size_id, labeldegree, s.labelsize, f.fit_type as fit_name, h.name as hood_name, hire, quantity
+                    .FromSqlRaw(@"SELECT oi.id, i.name as item_name, i.id as item_id, size as size_name, s.id as size_id, labeldegree, s.labelsize, f.fit_type as fit_name, h.name as hood_name, h.short_name as hood_short, hire, quantity
                                   FROM ordered_items oi
                                   INNER JOIN sku sk ON sk.id = oi.sku_id
                                   INNER JOIN orders o ON oi.order_id = o.id

@@ -11,6 +11,7 @@
         public string? Labeldegree { get; set; }
         public string? FitName { get; set; }
         public string? HoodName { get; set; }
+        public string? HoodShort {  get; set; }
         public bool Hire {  get; set; }
         public short Quantity { get; set; }
     }
