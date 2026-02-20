@@ -293,9 +293,12 @@ namespace GownApi.Endpoints
 
                             if (sku != null)
                             {
-                                if (itemLookup.TryGetValue(sku.ItemId, out var item))
+                                if (sku.ItemId.HasValue &&
+                                    itemLookup.TryGetValue(sku.ItemId.Value, out var item))
+                                {
                                     itemName = item?.Name ?? "";
-                                itemType = item?.Type ?? "";
+                                    itemType = item?.Type ?? "";
+                                }
 
                                 if (sku.SizeId != null && sizeLookup.TryGetValue(sku.SizeId.Value, out var size))
                                     sizeName = size.Labelsize ?? size.Size ?? "";

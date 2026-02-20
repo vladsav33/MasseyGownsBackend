@@ -99,6 +99,19 @@ namespace GownApi.Endpoints
                     .ToListAsync();
                 return Results.Ok(results);
             });
+
+            _ = app.MapPatch("admin/sku/{id}", async (int id, Sku skuUpdated, GownDb db) =>
+            {
+                var sku = await db.Sku.FindAsync(id);
+                if (sku is null)
+                    return Results.NotFound();
+
+                if (skuUpdated.Count.HasValue)
+                    sku.Count = skuUpdated.Count;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(skuUpdated);
+            });
         }
     }
 }
