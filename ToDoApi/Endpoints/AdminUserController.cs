@@ -114,6 +114,25 @@ namespace GownApi.Endpoints
                 return Results.Ok("Active status updated.");
             });
 
+            app.MapPut("/admin/users/{id}/approver", async (
+                int id,
+                ChangeApprover req,
+                GownDb db) => {
+                if (req.Approver == null)
+                    return Results.BadRequest("Approver flag is required.");
+
+                var user = await db.users.FindAsync(id);
+                if (user == null)
+                    return Results.NotFound("User not found.");
+
+                user.Approver = req.Approver;
+
+                await db.SaveChangesAsync();
+
+                return Results.Ok("Approver status updated.");
+            });
+
+
             app.MapDelete("/admin/users/{id}", async (int id, GownDb db) =>
             {
                 var user = await db.users.FindAsync(id);
@@ -136,6 +155,11 @@ namespace GownApi.Endpoints
     public class ChangeActive
     {
         public bool? Active { get; set; }
+    }
+
+    public class ChangeApprover
+    {
+        public bool? Approver { get; set; }
     }
 }
 
