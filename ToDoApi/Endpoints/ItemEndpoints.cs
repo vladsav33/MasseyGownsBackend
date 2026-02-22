@@ -48,12 +48,17 @@ namespace GownApi.Endpoints
                 var itemsDtoList = itemsDto.ToList();
                 return Results.Ok(itemsDtoList);
             });
+
             app.MapGet("/itemsonly", async (GownDb db) => {
                 return await db.items.ToListAsync();
             });
 
             app.MapGet("/sizesonly", async (GownDb db) => {
-                return await db.sizes.ToListAsync();
+                var results = await db.sizes
+                .FromSqlRaw(@"SELECT s.id, s.item_id, s.fit_id, f.fit_type as fit_name, s.size, s.labelsize, s.price
+                             FROM sizes s
+                             LEFT JOIN fit f ON s.fit_id = f.id").ToListAsync();
+                return results;
             });
 
             app.MapGet("/hoodsonly", async (GownDb db) => {
