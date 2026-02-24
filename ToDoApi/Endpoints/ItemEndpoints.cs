@@ -117,6 +117,16 @@ namespace GownApi.Endpoints
                 await db.SaveChangesAsync();
                 return Results.Ok(skuUpdated);
             });
+
+            _ = app.MapPost("admin/sku", async (Sku skuUpdated, GownDb db) =>
+            {
+                if (skuUpdated == null)
+                    return Results.BadRequest("No sku to insert");
+
+                db.Sku.Add(skuUpdated);
+                return Results.Ok();
+
+            });
         }
     }
 }
