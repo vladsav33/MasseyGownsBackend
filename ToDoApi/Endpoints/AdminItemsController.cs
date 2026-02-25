@@ -203,6 +203,34 @@ namespace GownApi.Endpoints
                 var results = await db.prices.ToListAsync();
                 return Results.Ok(results);
             });
+
+            _ = app.MapPost("/admin/prices", async (GownDb db, Prices updatedPrices) =>
+            {
+                db.prices.Add(updatedPrices);
+                await db.SaveChangesAsync();
+
+                return Results.Created($"/admin/prices/{updatedPrices.Id}", updatedPrices);
+            });
+
+            _ = app.MapPut("admin/prices/{$id}", async (int id, Prices updatedPrices, GownDb db) =>
+            {
+                var price = await db.prices.FindAsync(id);
+                if (price == null) return Results.NotFound();
+
+                price.PriceCode = updatedPrices.PriceCode;
+                price.PriceNote = updatedPrices.PriceNote;
+                price.Name = updatedPrices.Name;
+                price.Gown = updatedPrices.Gown;
+                price.Hat = updatedPrices.Hat;
+                price.Hood = updatedPrices.Hood;
+                price.XtraHood = updatedPrices.XtraHood;
+                price.UcolSash = updatedPrices.UcolSash;
+                price.Freight = updatedPrices.Freight;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(updatedPrices);
+            }
+            );
         }
         public class ItemsUpdateDto
         {
