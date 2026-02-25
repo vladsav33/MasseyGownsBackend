@@ -36,6 +36,7 @@ namespace GownApi
         public DbSet<EmailTemplate> EmailTemplates { get; set; } 
         public DbSet<CountBulkDto> countBulkDto { get; set; }
         public DbSet<BulkOrderLabels> bulkOrderLabels { get; set; }
+        public DbSet<Prices> prices { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

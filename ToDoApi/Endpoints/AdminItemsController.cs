@@ -197,6 +197,12 @@ namespace GownApi.Endpoints
 
                 return Results.Ok(itemsDetails);
             });
+
+            _ = app.MapGet("/admin/prices", async (GownDb db) =>
+            {
+                var results = await db.prices.ToListAsync();
+                return Results.Ok(results);
+            });
         }
         public class ItemsUpdateDto
         {
