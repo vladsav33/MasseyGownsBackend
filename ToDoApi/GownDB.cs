@@ -37,6 +37,9 @@ namespace GownApi
         public DbSet<CountBulkDto> countBulkDto { get; set; }
         public DbSet<BulkOrderLabels> bulkOrderLabels { get; set; }
         public DbSet<Prices> prices { get; set; }
+        public DbSet<CeremonyImport> CeremonyImport { get; set; }
+        public DbSet<HiredNotGraduated> hiredNotGraduated { get; set; }
+        public DbSet<GraduatedNotHired> graduatedNotHired { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

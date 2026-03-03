@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace GownApi.Model;
 
-public partial class Faq
+public partial class FaqNew
 {
-    public int Id { get; set; }
+    public int FaqId { get; set; }
 
     public string Question { get; set; } = null!;
 

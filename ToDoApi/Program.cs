@@ -235,6 +235,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.AdminBulkOrderEndpoints();
+app.AdminOrderEndpoints();
 app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
 app.AdminCeremonyEndpoints();

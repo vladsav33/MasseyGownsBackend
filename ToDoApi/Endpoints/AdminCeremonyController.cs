@@ -2,6 +2,7 @@
 using DocumentFormat.OpenXml.InkML;
 using DocumentFormat.OpenXml.Office2010.Excel;
 using GownApi.Model;
+using GownApi.Model.Dto;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -106,6 +107,61 @@ namespace GownApi.Endpoints
 
                 await db.SaveChangesAsync();
                 return Results.Ok(ceremony);
+            });
+
+            app.MapPost("/admin/dataceremony", async (List<DataCeremonyDto> dataceremonyDto, GownDb db, ILogger<Program> logger) =>
+            {
+                try
+                {
+                    var dataceremony = new List<CeremonyImport>();
+
+                    logger.LogInformation(
+                        "POST /admin/dataceremony payload:\n{Body}",
+                        JsonSerializer.Serialize(
+                            dataceremonyDto,
+                            new JsonSerializerOptions { WriteIndented = true }
+                        )
+                    );
+
+
+                    foreach (var order in dataceremonyDto)
+                    {
+
+                        logger.LogInformation("Student Id={order.StudentId}", order.Student_ID);
+
+                        if (order.Student_ID == 0)
+                        {
+                            return Results.NotFound("Student Id is null or missing");
+                        }
+
+                        dataceremony.Add(new CeremonyImport
+                        {
+                            Year = order.Year,
+                            Location = order.Location,
+                            CeremonyName = order.Ceremony_full_name1,
+                            StudentId = order.Student_ID.ToString(),
+                            Forename = order.Forename1,
+                            Surname = order.Surname,
+                            FullName = order.Full_Name,
+                            ProgramCode = order.Programme_code,
+                            ProgramDesc = order.Programme_Description,
+                            Mobile = order.Mobile.ToString(),
+                        });
+                    }
+
+                    await db.CeremonyImport.AddRangeAsync(dataceremony);
+                    await db.SaveChangesAsync();
+                    return Results.Created("/admin/dataceremony", new { inserted = dataceremonyDto.Count });
+                }
+                catch (Exception ex)
+                {
+                    return Results.BadRequest(new
+                    {
+                        //error = "One or more records violate database constraints",
+                        error = ex.Message,
+                        details = ex.InnerException?.Message
+                    });
+                }
             });
         }
     }
