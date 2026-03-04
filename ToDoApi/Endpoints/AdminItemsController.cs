@@ -169,8 +169,8 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/items/ceremony/{id}", async (int id, GownDb db) => {
 
                 var sql = @"SELECT o.id as id, o.first_name, o.last_name, 
-                                STRING_AGG(s.gown_size::text, ', ') FILTER (WHERE i.category = 'Academic Gown')  AS gown_size,
-                                STRING_AGG(s.stole_size, ', ') FILTER (WHERE i.category = 'Academic Gown') AS stole_size,
+                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown')  AS gown_size,
+                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown') AS stole_size,
                                 STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Headwear') AS hat_size,
                                 STRING_AGG(h.short_name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_name
                                 FROM orders o
