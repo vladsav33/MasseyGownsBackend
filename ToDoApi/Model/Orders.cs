@@ -26,14 +26,26 @@
         public string? Note { get; set; }
         public string? Changes { get; set; }
         public string? PackNote { get; set; }
-        public float? AmountPaid { get; set; }
-        public float? AmountOwning {  get; set; }
-        public float? Donation {  get; set; }
-        public float? Freight { get; set; }
-        public float? Refund { get; set; }
-        public float? AdminCharges { get; set; }
+        public decimal? AmountPaid { get; set; }
+        public decimal? AmountOwning {  get; set; }
+        public decimal? Donation {  get; set; }
+        public decimal? Freight { get; set; }
+        public decimal? Refund { get; set; }
+        public decimal? AdminCharges { get; set; }
         public DateOnly? PayBy { get; set; }
         public int? Status { get; set; }
         public string? ReferenceNo { get; set; }
+        public string? PaymentTxnId { get; set; }
+
+        public bool Refunded { get; set; }
+        public decimal? RefundedAmount { get; set; }
+        public string? RefundTxnId { get; set; }
+        public DateTimeOffset? RefundedAt { get; set; }
+        public DateTimeOffset? RefundEmailSentAt { get; set; }
+        public int? RefundLastEc { get; set; }
+        public string? RefundLastEm { get; set; }
+        public RefundStatusCode RefundStatusCode { get; set; } = RefundStatusCode.None;
+
+
     }
 }

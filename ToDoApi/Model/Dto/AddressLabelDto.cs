@@ -20,7 +20,9 @@
         public string City { get; set; } = "";
         public string Postcode { get; set; } = "";
 
-     
+        public string Ceremony { get; set; }  //20260201
+
+
     }
 
 }

@@ -55,9 +55,14 @@ namespace GownApi.Controllers
                     }
                 }
 
-                var labels = await q
-                    .OrderByDescending(o => o.OrderDate)
-                    .Select(o => new AddressLabelDto
+                var labels = await (
+                    from o in q 
+                    join c in _db.ceremonies.AsNoTracking() on o.CeremonyId equals c.Id into cj
+                    from c in cj.DefaultIfEmpty()
+                    orderby o.OrderDate descending
+                    select new AddressLabelDto
+                    // .OrderByDescending(o => o.OrderDate)//20260201
+                    //.Select(o => new AddressLabelDto//20260201
                     {
                         LabelType = "individual",
                         OrderType = "individual",
@@ -70,7 +75,8 @@ namespace GownApi.Controllers
                         Address1 = o.Address ?? "",
                         Address2 = null,
                         City = o.City ?? "",
-                        Postcode = o.Postcode ?? ""
+                        Postcode = o.Postcode ?? "",
+                        Ceremony = c != null ? c.Name : "" //20260201
                     })
                     .ToListAsync();
 
@@ -124,7 +130,8 @@ namespace GownApi.Controllers
                     Address1 = x.c.CourierAddress ?? "",
                     Address2 = null,
                     City = x.c.City ?? "",
-                    Postcode = ""
+                    Postcode = "",
+                    Ceremony = x.c.Name //20260201
                 })
                 .ToListAsync();
 
