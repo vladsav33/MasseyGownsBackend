@@ -10,7 +10,9 @@ namespace GownApi
             : base(options) { }
         public DbSet<Degrees> degrees => Set<Degrees>();
         public DbSet<Items> items => Set<Items>();
+        public DbSet<ItemDetails> itemDetails => Set<ItemDetails>();
         public DbSet<Ceremonies> ceremonies => Set<Ceremonies>();
+        public DbSet<CeremonyDetails> ceremonyDetails => Set<CeremonyDetails>();
         public DbSet<DegreesAndCeremonies> degreesCeremonies => Set<DegreesAndCeremonies>();
         public DbSet<CeremonyDegree> ceremonyDegree => Set<CeremonyDegree>();
         public DbSet<CeremonyDegreeItem> ceremonyDegreeItems => Set<CeremonyDegreeItem>();
@@ -29,9 +31,15 @@ namespace GownApi
         public DbSet<Contacts> Contacts { get; set; }
         public DbSet<User> users { get; set; }
         public DbSet<Sku> Sku { get; set; }
+        public DbSet<SkuDetail> skuDetail { get; set; }
         public DbSet<CmsContentBlock> CmsContentBlocks { get; set; }
         public DbSet<EmailTemplate> EmailTemplates { get; set; } 
         public DbSet<CountBulkDto> countBulkDto { get; set; }
+        public DbSet<BulkOrderLabels> bulkOrderLabels { get; set; }
+        public DbSet<Prices> prices { get; set; }
+        public DbSet<CeremonyImport> CeremonyImport { get; set; }
+        public DbSet<HiredNotGraduated> hiredNotGraduated { get; set; }
+        public DbSet<GraduatedNotHired> graduatedNotHired { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

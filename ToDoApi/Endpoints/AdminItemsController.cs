@@ -2,6 +2,7 @@
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Text.Json;
 
 namespace GownApi.Endpoints
@@ -37,7 +38,7 @@ namespace GownApi.Endpoints
                                 FROM public.ceremony_degree_item cdi
                                 INNER JOIN public.items i on cdi.item_id = i.id
 					            INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id
-                                WHERE cdi.ceremony_degree_id = {0} ORDER BY i.category, i.name", id)
+                                WHERE cd.degree_id = {0} AND cd.graduation_id = 2 ORDER BY i.category, i.name", id)
                 .ToListAsync();
 
                 var itemsDto = new List<ItemDegreeDto>();
@@ -164,6 +165,72 @@ namespace GownApi.Endpoints
 
                 return Results.Ok();
             });
+
+            app.MapGet("/admin/items/ceremony/{id}", async (int id, GownDb db) => {
+
+                var sql = @"SELECT o.id as id, o.first_name, o.last_name, 
+                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown')  AS gown_size,
+                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown') AS stole_size,
+                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Headwear') AS hat_size,
+                                STRING_AGG(h.short_name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_name
+                                FROM orders o
+                                INNER JOIN ordered_items oi
+                                ON oi.order_id = o.id
+                                INNER JOIN sku sk
+                                ON oi.sku_id = sk.id
+                                INNER JOIN items i
+                                ON i.id = sk.item_id
+                                LEFT JOIN sizes s
+                                ON sk.size_id = s.id
+                                LEFT JOIN hood_type h
+                                ON sk.hood_id = h.id
+                                WHERE i.category <> 'Donation' AND ceremony_id = @id
+                                GROUP BY o.id, o.first_name, o.last_name
+                                ORDER BY o.id";
+
+                var param = new NpgsqlParameter("@id", id);
+
+                var itemsDetails = await db.itemDetails
+                    .FromSqlRaw(sql, param)
+                    //.AsNoTracking()
+                    .ToListAsync();
+
+                return Results.Ok(itemsDetails);
+            });
+
+            _ = app.MapGet("/admin/prices", async (GownDb db) =>
+            {
+                var results = await db.prices.ToListAsync();
+                return Results.Ok(results);
+            });
+
+            _ = app.MapPost("/admin/prices", async (GownDb db, Prices updatedPrices) =>
+            {
+                db.prices.Add(updatedPrices);
+                await db.SaveChangesAsync();
+
+                return Results.Created($"/admin/prices/{updatedPrices.Id}", updatedPrices);
+            });
+
+            _ = app.MapPut("admin/prices/{$id}", async (int id, Prices updatedPrices, GownDb db) =>
+            {
+                var price = await db.prices.FindAsync(id);
+                if (price == null) return Results.NotFound();
+
+                price.PriceCode = updatedPrices.PriceCode;
+                price.PriceNote = updatedPrices.PriceNote;
+                price.Name = updatedPrices.Name;
+                price.Gown = updatedPrices.Gown;
+                price.Hat = updatedPrices.Hat;
+                price.Hood = updatedPrices.Hood;
+                price.XtraHood = updatedPrices.XtraHood;
+                price.UcolSash = updatedPrices.UcolSash;
+                price.Freight = updatedPrices.Freight;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(updatedPrices);
+            }
+            );
         }
         public class ItemsUpdateDto
         {

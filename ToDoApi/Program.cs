@@ -268,6 +268,7 @@ app.Map("/error", (HttpContext httpContext, ILogger<Program> logger) =>
 });
 
 app.AdminBulkOrderEndpoints();
+app.AdminOrderEndpoints();
 app.AdminItemsEndpoints();
 app.AdminDegreeEndpoints();
 app.AdminCeremonyEndpoints();

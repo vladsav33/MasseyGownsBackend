@@ -24,7 +24,8 @@ namespace GownApi.Endpoints
                             FROM public.ceremony_degree g
                             INNER JOIN public.ceremonies c ON c.id = g.graduation_id
                             INNER JOIN public.degrees d ON d.id = g.degree_id
-                            WHERE g.active AND c.id = {0}", id)
+                            WHERE g.active AND c.id = {0}
+                            ORDER BY d.degree_order", id)
                     .ToListAsync();
 
                 return Results.Ok(results);

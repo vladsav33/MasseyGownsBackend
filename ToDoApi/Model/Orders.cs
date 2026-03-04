@@ -45,7 +45,6 @@
         public int? RefundLastEc { get; set; }
         public string? RefundLastEm { get; set; }
         public RefundStatusCode RefundStatusCode { get; set; } = RefundStatusCode.None;
-
-
+        public string? GstNo { get; set; }
     }
 }

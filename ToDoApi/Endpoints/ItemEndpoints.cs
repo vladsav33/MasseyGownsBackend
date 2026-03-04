@@ -48,12 +48,17 @@ namespace GownApi.Endpoints
                 var itemsDtoList = itemsDto.ToList();
                 return Results.Ok(itemsDtoList);
             });
+
             app.MapGet("/itemsonly", async (GownDb db) => {
                 return await db.items.ToListAsync();
             });
 
             app.MapGet("/sizesonly", async (GownDb db) => {
-                return await db.sizes.ToListAsync();
+                var results = await db.sizes
+                .FromSqlRaw(@"SELECT s.id, s.item_id, s.fit_id, f.fit_type as fit_name, s.size, s.labelsize, s.price
+                             FROM sizes s
+                             LEFT JOIN fit f ON s.fit_id = f.id").ToListAsync();
+                return results;
             });
 
             app.MapGet("/hoodsonly", async (GownDb db) => {
@@ -80,6 +85,47 @@ namespace GownApi.Endpoints
 
                 var itemsDtoList = itemsDto.ToList();
                 return Results.Ok(itemsDtoList);
+            });
+
+            app.MapGet("/admin/sku", async (GownDb db) =>
+            {
+                var results = await db.skuDetail
+                    .FromSqlRaw(@"SELECT sk.id, i.name, s.size, s.labelsize, f.fit_type, h.name as hood, sk.count as count FROM sku sk
+                                  LEFT JOIN items i
+                                  ON i.id = sk.item_id
+                                  LEFT JOIN sizes s
+                                  ON s.id = sk.size_id
+                                  LEFT JOIN fit f
+                                  ON f.id = sk.fit_id
+                                  LEFT JOIN hood_type h
+                                  ON h.id = sk.hood_id
+                                  WHERE i.category <> 'Delivery' AND i.category <> 'Set' AND i.category <> 'Donation'
+                                  ORDER BY i.name, f.fit_type, s.display_order, h.name")
+                    .ToListAsync();
+                return Results.Ok(results);
+            });
+
+            _ = app.MapPatch("admin/sku/{id}", async (int id, Sku skuUpdated, GownDb db) =>
+            {
+                var sku = await db.Sku.FindAsync(id);
+                if (sku is null)
+                    return Results.NotFound();
+
+                if (skuUpdated.Count.HasValue)
+                    sku.Count = skuUpdated.Count;
+
+                await db.SaveChangesAsync();
+                return Results.Ok(skuUpdated);
+            });
+
+            _ = app.MapPost("admin/sku", async (Sku skuUpdated, GownDb db) =>
+            {
+                if (skuUpdated == null)
+                    return Results.BadRequest("No sku to insert");
+
+                db.Sku.Add(skuUpdated);
+                return Results.Ok();
+
             });
         }
     }
