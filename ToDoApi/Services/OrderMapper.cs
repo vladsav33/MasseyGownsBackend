@@ -98,7 +98,15 @@ namespace GownApi.Services
                 AdminCharges = order.AdminCharges,
                 PayBy = order.PayBy,
                 Status = order.Status,
-                ReferenceNo = order.ReferenceNo
+                ReferenceNo = order.ReferenceNo,
+                RefundedAmount = order.RefundedAmount,
+                RefundTxnId = order.RefundTxnId,
+                RefundedAt = order.RefundedAt,
+                RefundEmailSentAt = order.RefundEmailSentAt,
+                PaymentTxnId = order.PaymentTxnId,
+                RefundLastEc = order.RefundLastEc,
+                RefundLastEm = order.RefundLastEm,
+                RefundStatusCode = order.RefundStatusCode
             };
         }
 

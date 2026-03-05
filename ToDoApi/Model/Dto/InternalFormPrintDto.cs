@@ -18,7 +18,7 @@
         public string ReceiptNo { get; set; } = "";
 
         public bool Paid { get; set; }
-        public float? AmountPaid { get; set; }
+        public decimal? AmountPaid { get; set; }
 
         public List<InternalFormPrintItemDto> Items { get; set; } = new();
     }

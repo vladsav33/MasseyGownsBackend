@@ -1,17 +1,23 @@
 ﻿using Azure.Storage;
 using Azure.Storage.Blobs;
+using DocumentFormat.OpenXml.InkML;
 using GownApi;
 using GownApi.Endpoints;
 using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
+using GownApi.Services.Paystation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Events;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,12 +41,15 @@ else
 }
 
 // Email service
-builder.Services.AddScoped<IEmailService, EmailService>();
+
 builder.Services.AddScoped<IPdfService, PdfService>();
+builder.Services.AddSingleton<IQueueJobPublisher, QueueJobPublisher>();
+
 
 var connectionString = builder.Configuration.GetConnectionString("GownDb");
 
-var key = Encoding.ASCII.GetBytes("SuperSecretKey123!"); // Use a secure key in production
+var key = Encoding.ASCII.GetBytes("iREWTEWGfgweGERWgtGWgwET$#%q34GG#$%%3$##%GHBNBsgfdgwe345");
+
 
 builder.Services.AddAuthentication(options =>
 {
@@ -49,14 +58,16 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
         ValidateIssuer = false,
-        ValidateAudience = false
+        ValidateAudience = false,
+
+         //JWT
+        RoleClaimType = ClaimTypes.Role,
+        NameClaimType = ClaimTypes.Name
     };
 });
 
@@ -68,15 +79,50 @@ builder.Services.AddDbContext<GownDb>(options =>
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+//builder.Services.AddSwaggerGen(); JWT
+//JWT
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "GownApi", Version = "v1" });
 
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter: Bearer {your JWT token}"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
-
 builder.Services.AddHttpClient();
-
+builder.Services.AddHttpClient<PaystationQuickLookupClient>();
+builder.Services.AddHttpClient("Paystation", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.Configure<PaystationOptions>(
     builder.Configuration.GetSection("Paystation"));
+
+var gatewayId = builder.Configuration["Paystation:GatewayId"];
+var isPaystationonDev = string.Equals(gatewayId, "DEVELOPMENT", StringComparison.Ordinal);
 
 // CORS for frontend
 builder.Services.AddCors(options =>
@@ -122,54 +168,27 @@ builder.Services.AddSingleton(sp =>
     return new BlobServiceClient(blobUri, credential);
 });
 
-builder.Services.Configure<SmtpSettings>(
-    builder.Configuration.GetSection("Smtp"));
+//builder.Services.Configure<SmtpSettings>(
+//    builder.Configuration.GetSection("Smtp"));
 
 var app = builder.Build();
 
-// Correlation ID middleware 
+app.UseExceptionHandler("/error");
+
+// OrderNo & Correlation ID middleware 
 app.Use(async (context, next) =>
 {
-    var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+    var orderNo = context.Request.Headers["OrderNo"].FirstOrDefault()?? "NotCreatedYet";
+    var correlationId = context.TraceIdentifier;
 
-    if (string.IsNullOrWhiteSpace(correlationId))
-        correlationId = context.TraceIdentifier;
+    context.Items["OrderNo"] = orderNo;
+    context.Response.Headers["CorrelationID"] = correlationId;
 
     using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
+    using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo )) 
     {
-        context.Response.Headers["X-Correlation-ID"] = correlationId;
         await next();
     }
-});
-
-//OrderNo middleware: capture ORD from header/query/route and push into LogContext
-// Put it after CorrelationId middleware so logs include both Corr + Order when available.
-app.Use(async (context, next) =>
-{
-   
-    var orderNo = context.Request.Headers["X-Order-No"].FirstOrDefault();
-
-  
-    if (string.IsNullOrWhiteSpace(orderNo))
-        orderNo = context.Request.Query["orderNo"].FirstOrDefault();
-
- 
-    if (string.IsNullOrWhiteSpace(orderNo) &&
-        context.Request.RouteValues.TryGetValue("orderNo", out var rv))
-    {
-        orderNo = rv?.ToString();
-    }
-
-    if (!string.IsNullOrWhiteSpace(orderNo))
-    {
-        using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo))
-        {
-            await next();
-        }
-        return;
-    }
-
-    await next();
 });
 
 //Request logging: method/path/status/elapsed + enrich extra fields
@@ -189,50 +208,64 @@ app.UseSerilogRequestLogging(options =>
 
     options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
     {
-        diagnosticContext.Set("CorrelationId", httpContext.Response.Headers["X-Correlation-ID"].ToString());
+        diagnosticContext.Set("CorrelationId", httpContext.Response.Headers["CorrelationID"].ToString());
         diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
         diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
-
-        string? orderNo = null;
-
-        // Try to get OrderNo for request log line
-        if (httpContext.Items.TryGetValue("OrderNo", out var ordObj)
-            && ordObj is string ord
-            && !string.IsNullOrWhiteSpace(ord))
-        {
-            orderNo = ord;
-        }
-        else
-        {
-            // Fallbacks (optional)
-            var ordHeader = httpContext.Request.Headers["X-Order-No"].FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(ordHeader))
-            {
-                orderNo = ordHeader;
-            }
-            else
-            {
-                var ordQuery = httpContext.Request.Query["orderNo"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(ordQuery))
-                {
-                    orderNo = ordQuery;
-                }
-            }
-        }
-
-        // Always set both, so template can decide whether to show the bracket part
-        diagnosticContext.Set("OrderNo", orderNo ?? "");
-        diagnosticContext.Set("OrderTag", string.IsNullOrWhiteSpace(orderNo) ? "" : $" (Order:{orderNo})");
+        diagnosticContext.Set("OrderNo", httpContext.Items["OrderNo"]?.ToString() ?? "NotCreatedYet");
     };
 });
+
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseCors("AllowFrontend");
+if (isPaystationonDev) {
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
-app.UseSwagger();
-app.UseSwaggerUI();
+app.Map("/error", (HttpContext httpContext, ILogger<Program> logger) =>
+{
+    var exceptionFeature = httpContext.Features.Get<IExceptionHandlerPathFeature>();
+    var ex = exceptionFeature?.Error;
+
+    var traceId = httpContext.Response.Headers["CorrelationID"].FirstOrDefault()
+                  ?? httpContext.TraceIdentifier;
+
+    var originalPath = exceptionFeature?.Path ?? httpContext.Request.Path.ToString();
+
+    var orderNo = httpContext.Items["OrderNo"]?.ToString() ?? "NotCreatedYet";
+
+    if (ex is not null)
+    {
+        logger.LogError(
+            ex,
+            "Unhandled exception. Path={Path}, Method={Method}, TraceId={TraceId}, orderNo={orderNo}",
+            originalPath,
+            httpContext.Request.Method,
+            traceId,
+            orderNo);
+    }
+    else
+    {
+        logger.LogError(
+            "Unhandled exception reached /error, but no exception details were available. Path={Path}, Method={Method}, TraceId={TraceId},orderNo={orderNo} ",
+            originalPath,
+            httpContext.Request.Method,
+            traceId,
+            orderNo);
+    }
+
+    return Results.Problem(
+        title: "An unexpected error occurred.",
+        statusCode: StatusCodes.Status500InternalServerError,
+        extensions: new Dictionary<string, object?>
+        {
+            ["traceId"] = traceId
+        }
+    );
+});
 
 app.AdminBulkOrderEndpoints();
 app.AdminOrderEndpoints();
@@ -250,31 +283,12 @@ app.MapItemsetsEndpoints();
 app.MapContactEndpoints();
 app.MapDeliveryEndpoints();
 app.MapPaymentEndpoints();
+app.MapRefundEndpoints();
 app.MapControllers();
 app.MapEmailEndpoints();
+app.MapAdminRefundLookupEndpoints();
+app.MapAdminRefundSyncEndpoints();
 
-// Simple test endpoint for Blob connectivity
-app.MapGet("/test-blob", async (BlobServiceClient blobClient) =>
-{
-    try
-    {
-        var containers = blobClient.GetBlobContainersAsync();
-        var list = new List<string>();
-
-        await foreach (var container in containers)
-        {
-            list.Add(container.Name);
-        }
-
-        return Results.Ok(list);
-    }
-    catch (Exception ex)
-    {
-        // Optional: log server-side as well
-        Log.Error(ex, "Blob connectivity test failed");
-        return Results.Problem(ex.Message);
-    }
-});
 
 try
 {
