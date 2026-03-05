@@ -9,5 +9,6 @@
         public string? StoleSize { get; set; }
         public string? HatSize { get; set; } 
         public string? HoodName { get; set; }
+        public string? SashName { get; set; }
     }
 }
