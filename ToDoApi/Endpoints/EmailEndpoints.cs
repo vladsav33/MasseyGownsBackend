@@ -22,6 +22,7 @@ namespace GownApi.Endpoints
                 // 1) Key check
                 var expectedKey = config["InternalEmail:Key"];
                 var providedKey = req.Headers["X-Internal-Key"].ToString();
+                var emailType = req.Headers["X-Email-Type"].ToString();
 
                 if (string.IsNullOrWhiteSpace(expectedKey) || providedKey != expectedKey)
                 {
@@ -100,10 +101,10 @@ namespace GownApi.Endpoints
                 var amountPaid = order.AmountPaid.HasValue && order.AmountPaid.Value > 0 ? order.AmountPaid.Value : total;
                 var balance = Math.Max(0, total - amountPaid);
 
-                // 5) Template
-                var template = await db.EmailTemplates
+                // 5) Template            
+                    var template = await db.EmailTemplates
                     .AsNoTracking()
-                    .SingleOrDefaultAsync(t => t.Name == "PaymentCompleted");
+                    .SingleOrDefaultAsync(t => t.Name == emailType);
 
                 if (template == null) return Results.Problem("Email template not found: PaymentCompleted");
 
@@ -113,7 +114,7 @@ namespace GownApi.Endpoints
 
                 var values = new Dictionary<string, string?>
                 {
-                    ["OrderNumber"] = order.ReferenceNo ?? order.Id.ToString(),
+                    ["OrderNumber"] = order.ReferenceNo,
                     ["OrderDate"] = orderDate,
                     ["FirstName"] = order.FirstName ?? "",
                     ["LastName"] = order.LastName ?? "",
@@ -123,11 +124,14 @@ namespace GownApi.Endpoints
                     ["Country"] = order.Country ?? "",
                     ["StudentId"] = order.StudentId.ToString(),
                     ["Email"] = order.Email ?? "",
+                    ["Mobile"] = order.Phone ?? "",
                     ["Total"] = total.ToString("0.00"),
                     ["AmountPaid"] = amountPaid.ToString("0.00"),
                     ["BalanceOwing"] = balance.ToString("0.00"),
                     ["EventTitle"] = eventTitle,
-                    ["CeremonyDate"] = ceremonyDate
+                    ["CeremonyDate"] = ceremonyDate,
+                    ["GstNumber"] = "41-782-315",
+                    ["InvoiceNumber"] = order.ReferenceNo
                 };
 
                 var subject = ApplyTemplate(template.SubjectTemplate, values);
