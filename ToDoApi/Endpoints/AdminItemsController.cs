@@ -172,7 +172,8 @@ namespace GownApi.Endpoints
                                 STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown')  AS gown_size,
                                 STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown') AS stole_size,
                                 STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Headwear') AS hat_size,
-                                STRING_AGG(h.short_name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_name
+                                STRING_AGG(h.short_name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_name,
+                                STRING_AGG(i.name, ', ') FILTER (WHERE i.category = 'Sash') AS sash_name
                                 FROM orders o
                                 INNER JOIN ordered_items oi
                                 ON oi.order_id = o.id
