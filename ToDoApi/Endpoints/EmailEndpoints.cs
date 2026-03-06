@@ -128,7 +128,8 @@ namespace GownApi.Endpoints
                 }
             });
         }
-
+        
+        //Shared rendering function
         private static async Task<RenderedReceipt?> RenderReceiptAsync(GownDb db, int orderId, string templateName)
         {
             // 1) Load order
