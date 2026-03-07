@@ -1,4 +1,5 @@
-﻿using GownApi.Model;
+﻿using DocumentFormat.OpenXml.Bibliography;
+using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ namespace GownApi.Endpoints
     {
         public static void MapOrderEnpoints(this WebApplication app)
         {
-            app.MapGet("/orders", async (GownDb db, bool ? numbers = false) =>
+            app.MapGet("/orders", async (GownDb db, bool? numbers = false) =>
             {
                 //var result = await db.orders.ToListAsync();
                 List<OrderGet> result = new();
@@ -86,7 +87,7 @@ namespace GownApi.Endpoints
                 return Results.Ok(results);
             });
 
-            app.MapPost("/orders", async (OrderDto orderDto, GownDb db, ILogger<Program> logger, HttpContext httpContext) =>
+            app.MapPost("/orders", async (OrderDto orderDto, GownDb db, ILogger<Program> logger, HttpContext httpContext, IQueueJobPublisher publisher) =>
             {
                 var order = OrderMapper.FromDto(orderDto);
 
@@ -94,20 +95,21 @@ namespace GownApi.Endpoints
                 await db.SaveChangesAsync();
 
                 var updatedOrder = await db.orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == order.Id);
+                if (updatedOrder == null)
+                {
+                    logger.LogError("Failed to retrieve the newly created order with ID: {id}", order.Id);
+                    return Results.StatusCode(500);
+                }
 
-                var orderNo = updatedOrder?.ReferenceNo ?? "";
-                var orderTag = string.IsNullOrWhiteSpace(orderNo) ? "" : $" (Order:{orderNo})";
+                var orderNo = updatedOrder.ReferenceNo;
+                var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
 
-                
                 httpContext.Items["OrderNo"] = orderNo;
 
-                
                 using (LogContext.PushProperty("OrderNo", orderNo))
-                using (LogContext.PushProperty("OrderTag", orderTag))
                 using (logger.BeginScope(new Dictionary<string, object?>
                 {
-                    ["OrderNo"] = orderNo,
-                    ["OrderTag"] = orderTag
+                    ["OrderNo"] = orderNo
                 }))
                 {
                     foreach (var item in orderDto.Items)
@@ -147,6 +149,25 @@ namespace GownApi.Endpoints
 
                     var result = await db.SaveChangesAsync();
                     logger.LogInformation("POST /orders called, result: {id}", result);
+
+                    // Enqueue purchase order email here
+
+                    if (updatedOrder.PaymentMethod == 3)
+                    {
+                        try {
+                            await publisher.EnqueueEmailJobAsync(new EmailJob(
+                              Type: "PurchaseOrderCompleted",
+                              OrderId: updatedOrder.Id,
+                              ReferenceNo: orderNo,
+                              TxnId: updatedOrder.PurchaseOrder,
+                              OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                          ));
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, "Failed to send purchase order email for Order ID: {id}", updatedOrder.Id);
+                        }
+                    }
 
                     if (!string.IsNullOrWhiteSpace(orderNo))
                     {
