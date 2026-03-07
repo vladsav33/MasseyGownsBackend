@@ -18,4 +18,5 @@ public partial class HoodType
     public decimal? HoodBin { get; set; }
 
     public virtual Item? Item { get; set; }
+    public bool Doctoral { get; set; }
 }

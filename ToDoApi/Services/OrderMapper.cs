@@ -2,6 +2,7 @@
 using GownApi.Model;
 using GownApi.Model.Dto;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Playwright;
 
 namespace GownApi.Services
 {
@@ -52,7 +53,7 @@ namespace GownApi.Services
                 return null;
 
             var items = await db.selectedItemOut
-                    .FromSqlRaw(@"SELECT oi.id, i.name as item_name, i.id as item_id, size as size_name, s.id as size_id, labeldegree, s.labelsize, f.fit_type as fit_name, h.name as hood_name, h.short_name as hood_short, hire, quantity
+                    .FromSqlRaw(@"SELECT oi.id, oi.cost, i.name as item_name, i.id as item_id, size as size_name, s.id as size_id, labeldegree, s.labelsize, f.fit_type as fit_name, h.name as hood_name, h.short_name as hood_short, hire, quantity
                                   FROM ordered_items oi
                                   INNER JOIN sku sk ON sk.id = oi.sku_id
                                   INNER JOIN orders o ON oi.order_id = o.id
@@ -63,6 +64,8 @@ namespace GownApi.Services
                                   LEFT JOIN hood_type h ON h.id = sk.hood_id
                                   WHERE oi.order_id = {0}", order.Id)
                     .ToArrayAsync();
+
+            decimal amount = items.Sum(x => x.Cost);
 
             return new OrderDtoOut
             {
@@ -84,6 +87,7 @@ namespace GownApi.Services
                 PurchaseOrder = order.PurchaseOrder,
                 OrderDate = order.OrderDate,
                 Items = items,
+                Amount = amount,
                 CeremonyId = order.CeremonyId,
                 Ceremony = order.Ceremony,
                 DegreeId = order.DegreeId,

@@ -16,6 +16,7 @@
         public int StudentId { get; set; }
         public string? Message { get; set; }
         public SelectedItemOut[] Items { get; set; }
+        public decimal Amount { get; set; }
         public bool Paid { get; set; }
         public int? PaymentMethod { get; set; }
         public string? PurchaseOrder { get; set; }
