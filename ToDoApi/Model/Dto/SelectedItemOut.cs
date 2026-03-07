@@ -14,5 +14,6 @@
         public string? HoodShort {  get; set; }
         public bool Hire {  get; set; }
         public short Quantity { get; set; }
+        public decimal Cost { get; set; }
     }
 }

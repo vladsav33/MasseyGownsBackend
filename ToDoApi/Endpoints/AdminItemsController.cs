@@ -1,6 +1,7 @@
 ﻿using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
+using Microsoft.CodeAnalysis.Elfie.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Text.Json;
@@ -213,7 +214,7 @@ namespace GownApi.Endpoints
                 return Results.Created($"/admin/prices/{updatedPrices.Id}", updatedPrices);
             });
 
-            _ = app.MapPut("admin/prices/{$id}", async (int id, Prices updatedPrices, GownDb db) =>
+            _ = app.MapPut("/admin/prices/{$id}", async (int id, Prices updatedPrices, GownDb db) =>
             {
                 var price = await db.prices.FindAsync(id);
                 if (price == null) return Results.NotFound();
@@ -232,11 +233,75 @@ namespace GownApi.Endpoints
                 return Results.Ok(updatedPrices);
             }
             );
+
+            _ = app.MapGet("/admin/ceremony/itemcount/{id}", async (int id, GownDb db) =>
+            {
+                var category = "Headwear";
+                var sql = @"SELECT 
+                            s.labelsize AS item_size,
+                            COUNT(*) AS item_count
+                        FROM orders o
+                        INNER JOIN ordered_items oi ON oi.order_id = o.id
+                        INNER JOIN sku sk ON oi.sku_id = sk.id
+                        INNER JOIN items i ON i.id = sk.item_id
+                        LEFT JOIN sizes s ON sk.size_id = s.id
+                        WHERE i.category ILIKE @category
+                          AND o.ceremony_id = @id
+                        GROUP BY 
+                            s.labelsize
+                        ORDER BY 
+                            s.labelsize";
+
+                var result = new Dictionary<string, object>();
+
+                result["headwear"] =  await db.Database
+                    .SqlQueryRaw<ItemCountDto>(sql,
+                        new NpgsqlParameter("@id", id),
+                        new NpgsqlParameter("@category", category))
+                    .ToListAsync();
+
+                category = "Academic Gown";
+                result["gown"] = await db.Database
+                    .SqlQueryRaw<ItemCountDto>(sql,
+                        new NpgsqlParameter("@id", id),
+                        new NpgsqlParameter("@category", category))
+                    .ToListAsync();
+
+                category = "Hood";
+                sql = @"SELECT 
+                        h.name AS item_size,
+                        COUNT(*) AS item_count
+                    FROM orders o
+                    INNER JOIN ordered_items oi ON oi.order_id = o.id
+                    INNER JOIN sku sk ON oi.sku_id = sk.id
+                    INNER JOIN items i ON i.id = sk.item_id
+                    LEFT JOIN hood_type h ON sk.hood_id = h.id
+                    WHERE i.category = @category
+                      AND o.ceremony_id = @id
+                    GROUP BY 
+                        h.name
+                    ORDER BY 
+                        h.name";
+
+                result["hood"] = await db.Database
+                    .SqlQueryRaw<ItemCountDto>(sql,
+                        new NpgsqlParameter("@id", id),
+                        new NpgsqlParameter("@category", category))
+                    .ToListAsync();
+
+                return result;
+            });
         }
         public class ItemsUpdateDto
         {
             public int Id { get; set; }
             public bool Active { get; set; }
+        }
+
+        public class ItemCountDto
+        {
+            public string? ItemSize { get; set; }
+            public int ItemCount { get; set; }
         }
     }
 }
