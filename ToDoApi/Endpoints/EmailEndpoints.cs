@@ -195,7 +195,7 @@ namespace GownApi.Endpoints
 
                 var name = WebUtility.HtmlEncode(item?.Name ?? $"Item {oi.SkuId}");
                 var qty = oi.Quantity;
-                var price = (decimal)oi.Cost;
+                var price = oi.Cost;
                 var gst = Math.Round(price * 0.15m * qty, 2);
                 var lineTotal = price * qty;
 
@@ -256,8 +256,8 @@ namespace GownApi.Endpoints
 
             var subject = ApplyTemplate(template.SubjectTemplate, values);
             var bodyTop = ApplyTemplate(template.BodyHtml, values);
-
             var receiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
+
             receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
             receiptHtml = InjectCartRowsIntoCartTable(receiptHtml, sbRows.ToString());
 

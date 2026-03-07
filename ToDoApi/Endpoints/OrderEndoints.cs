@@ -142,7 +142,7 @@ namespace GownApi.Endpoints
                             SkuId = skuId[0].Id,
                             Quantity = item.Quantity,
                             Hire = item.Hire,
-                            Cost = item.Hire ? itemNew.HirePrice : itemNew.BuyPrice
+                            Cost = (decimal)(item.Hire ? itemNew.HirePrice : itemNew.BuyPrice)
                         };
                         db.orderedItems.Add(orderedItems);
                     }
