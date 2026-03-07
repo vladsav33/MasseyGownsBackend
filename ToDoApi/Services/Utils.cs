@@ -37,9 +37,14 @@ namespace GownApi.Services
                 .Select(f => new { f.Id, Value = f.FitType })
                 .ToListAsync();
 
+            var sql = "SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE NOT h.doctoral AND i.id = {0}";
+
+            if (items.DegreeId == 6 || items.DegreeId == 7)
+                sql = "SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE h.doctoral AND i.id = {0}";
+
             var hoods = await db.hoods
                 //.FromSqlRaw("SELECT h.id, h.name, h.item_id FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
-                .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE i.id = {0}",
+                .FromSqlRaw(sql,
                     items.Id)
                 .Select(h => new { h.Id, Value = h.Name })
                 .ToListAsync();
