@@ -126,7 +126,7 @@ namespace GownApi.Endpoints
                     logger.LogError(ex, "Failed to render front-end receipt. OrderId={OrderId}", orderId);
                     return Results.Problem("Failed to render receipt.");
                 }
-            });
+            });    
         }
         
         //Shared rendering function
@@ -349,10 +349,7 @@ namespace GownApi.Endpoints
                     var middle = m.Groups[2].Value;
                     var close = m.Groups[3].Value;
 
-                    var injected = $@"
-<div data-adh=""collection-time"" style=""margin-top:10px; font-size:14px; line-height:1.6;"">
-  <strong>{safe}</strong>
-</div>";
+                    var injected = $@"<div data-adh=""collection-time"" style=""margin-top:10px; font-size:14px; line-height:1.6;""><strong>{safe}</strong></div>";
 
                     return open + middle + injected + close;
                 },

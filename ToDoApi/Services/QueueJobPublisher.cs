@@ -4,10 +4,10 @@ using System.Text.Json;
 namespace GownApi.Services;
 
 public record EmailJob(
-    string Type,          // "PaymentCompleted" | "RefundCompleted"
-    int? OrderId,
-    string ReferenceNo,
-    string? TxnId,
+    string Type,         // "PaymentCompleted" | "RefundCompleted"
+    int? OrderId,        //Null for ContactQuery email jobs
+    string? ReferenceNo, //Null for ContactQuery email jobs
+    string? TxnId,       //Null for ContactQuery email and & purchase order jobs
     DateTimeOffset? OccurredAt
 );
 

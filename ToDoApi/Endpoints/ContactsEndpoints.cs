@@ -1,3 +1,5 @@
+using DocumentFormat.OpenXml.Bibliography;
+using GownApi.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,7 +12,7 @@ namespace GownApi.Endpoints
             var group = routes.MapGroup("/contacts").WithTags("GownApi");
 
             // POST /contacts
-            group.MapPost("/", async ([FromBody] Contacts contact, GownDb db) =>
+            group.MapPost("/", async ([FromBody] Contacts contact, GownDb db, IQueueJobPublisher publisher, ILogger<Program> logger) =>
             {
                 if (contact == null)
                 {
@@ -18,10 +20,27 @@ namespace GownApi.Endpoints
                 }
 
                 contact.Id = $"contacts_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+                var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
+                //contact.CreatedAt = TimeZoneInfo.ConvertTime(DateTime.UtcNow, nzTz);
                 contact.CreatedAt = DateTime.UtcNow;
 
                 db.Contacts.Add(contact);
                 await db.SaveChangesAsync();
+
+                try
+                {
+                    await publisher.EnqueueEmailJobAsync(new EmailJob(
+                      Type: "ContactQuery",
+                      OrderId: null,
+                      ReferenceNo: contact.Subject,
+                      TxnId: contact.Query,
+                      OccurredAt: TimeZoneInfo.ConvertTime(contact.CreatedAt, nzTz)
+                  ));
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to send Contact Query email for subject:{subject}", contact.Subject);
+                }
 
                 return Results.Ok(new { message = "Contact saved successfully!" });
             });

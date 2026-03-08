@@ -10,6 +10,6 @@ namespace GownApi
         public required string LastName { get; set; }     
         public required string Subject { get; set; }    
         public required string Query { get; set; }        
-        public DateTime CreatedAt { get; set; }  
+        public DateTimeOffset CreatedAt { get; set; }  
     }
 }
