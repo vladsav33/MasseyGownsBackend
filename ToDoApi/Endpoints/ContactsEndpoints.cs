@@ -46,9 +46,23 @@ namespace GownApi.Endpoints
             });
 
             // GET /contacts
-            group.MapGet("/", async (GownDb db) =>
+            group.MapGet("/", async (GownDb db, ILogger<Program> logger) =>
             {
-                return await db.Contacts.ToListAsync();
+                try
+                {
+                    logger.LogInformation("GET /contacts started");
+
+                    var contacts = await db.Contacts.ToListAsync();
+
+                    logger.LogInformation("GET /contacts succeeded. Count: {Count}", contacts.Count);
+
+                    return Results.Ok(contacts);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "GET /contacts failed");
+                    return Results.Problem(ex.Message);
+                }
             });
 
             // GET /contacts/{id}
