@@ -28,7 +28,7 @@
         public int SkuId { get; set; }
         public short Quantity { get; set; }
         public bool Hire { get; set; }
-        public float? Cost { get; set; }
+        public decimal? Cost { get; set; }
         public string ItemName { get; set; } = "";
         public string SizeName { get; set; } = "";
         public string ItemType { get; set; } = "";

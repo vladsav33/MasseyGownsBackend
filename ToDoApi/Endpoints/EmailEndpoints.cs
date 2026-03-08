@@ -126,7 +126,7 @@ namespace GownApi.Endpoints
                     logger.LogError(ex, "Failed to render front-end receipt. OrderId={OrderId}", orderId);
                     return Results.Problem("Failed to render receipt.");
                 }
-            });
+            });    
         }
         
         //Shared rendering function
@@ -195,7 +195,7 @@ namespace GownApi.Endpoints
 
                 var name = WebUtility.HtmlEncode(item?.Name ?? $"Item {oi.SkuId}");
                 var qty = oi.Quantity;
-                var price = (decimal)oi.Cost;
+                var price = oi.Cost;
                 var gst = Math.Round(price * 0.15m * qty, 2);
                 var lineTotal = price * qty;
 
@@ -256,8 +256,8 @@ namespace GownApi.Endpoints
 
             var subject = ApplyTemplate(template.SubjectTemplate, values);
             var bodyTop = ApplyTemplate(template.BodyHtml, values);
-
             var receiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
+
             receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
             receiptHtml = InjectCartRowsIntoCartTable(receiptHtml, sbRows.ToString());
 
@@ -349,10 +349,7 @@ namespace GownApi.Endpoints
                     var middle = m.Groups[2].Value;
                     var close = m.Groups[3].Value;
 
-                    var injected = $@"
-<div data-adh=""collection-time"" style=""margin-top:10px; font-size:14px; line-height:1.6;"">
-  <strong>{safe}</strong>
-</div>";
+                    var injected = $@"<div data-adh=""collection-time"" style=""margin-top:10px; font-size:14px; line-height:1.6;""><strong>{safe}</strong></div>";
 
                     return open + middle + injected + close;
                 },

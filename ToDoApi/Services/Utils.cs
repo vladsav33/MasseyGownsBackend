@@ -10,8 +10,8 @@ namespace GownApi.Services
         string Name { get; }
         //string DegreeName { get; }
         byte[]? Picture { get; }
-        float? HirePrice { get; set; }
-        float? BuyPrice { get; set; }
+        decimal? HirePrice { get; set; }
+        decimal? BuyPrice { get; set; }
         string Category { get; }
         string? Description { get; }
         bool IsHiring { get; }
