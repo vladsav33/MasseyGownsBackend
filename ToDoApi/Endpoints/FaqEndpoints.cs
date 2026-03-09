@@ -13,7 +13,7 @@ namespace GownApi.Endpoints
             // GET /faq
             app.MapGet("/faq", async (GownDb db) =>
             {
-                // 先把所有 block 读出来
+                
                 var blocks = await db.CmsContentBlocks
                     .Where(b => b.Page == FaqPageName)
                     .ToListAsync();
@@ -25,7 +25,7 @@ namespace GownApi.Endpoints
                         var displaySection = rawSection;
                         var sectionOrder = 0;
 
-                        // 解析类似 "Ordering and Payment.1" 的后缀
+                        // Parse something like "Ordering and Payment.1" 
                         var lastDot = rawSection.LastIndexOf('.');
                         if (lastDot > 0 && lastDot < rawSection.Length - 1)
                         {
@@ -44,14 +44,14 @@ namespace GownApi.Endpoints
                             SectionOrder = sectionOrder
                         };
                     })
-                    .OrderBy(x => x.DisplaySection)   // 按 section 名排序
-                    .ThenBy(x => x.SectionOrder)      // 再按你写在后缀的数字排序
-                    .ThenBy(x => x.Block.Id)          // 最后用 id 稳定排序
+                    .OrderBy(x => x.DisplaySection)   
+                    .ThenBy(x => x.SectionOrder)      
+                    .ThenBy(x => x.Block.Id)          
                     .Select(x => new FaqItem
                     {
                         Id = x.Block.Id,
                         Page = x.Block.Page,
-                        Section = x.DisplaySection,   // ✅ 前端看到的是“干净”的名字
+                        Section = x.DisplaySection,   
                         Key = x.Block.Key,
                         Type = x.Block.Type,
                         Label = x.Block.Label,
