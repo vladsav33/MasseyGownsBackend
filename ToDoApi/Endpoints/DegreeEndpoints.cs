@@ -15,7 +15,7 @@ namespace GownApi.Endpoints
                 : Results.NotFound());
 
             app.MapGet("/degrees", async (GownDb db) =>
-                await db.degrees.ToListAsync());
+                await db.degrees.OrderBy(x => x.DegreeOrder).ToListAsync());
 
             app.MapGet("/degreesbyceremony/{id}", async (int id, GownDb db) =>
             {

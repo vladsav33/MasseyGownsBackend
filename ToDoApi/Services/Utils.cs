@@ -100,7 +100,7 @@ namespace GownApi.Services
                                         }
                                     };
             }
-            if (items.Category == "Hood")
+            if (items.Category == "Hood" && hoods.Count > 0)
             {
                 itemDto.Options = new List<Dictionary<string, object>> {
                                         new () {
