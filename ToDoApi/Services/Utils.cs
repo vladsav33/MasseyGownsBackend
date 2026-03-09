@@ -90,7 +90,7 @@ namespace GownApi.Services
                                         }
                                     };
             }
-            if (items.Category == "Stole")
+            if (items.Category == "Stole" && sizes.Count > 0)
             {
                 itemDto.Options = new List<Dictionary<string, object>> {
                                         new () {
