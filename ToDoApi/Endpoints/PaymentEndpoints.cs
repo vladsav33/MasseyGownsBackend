@@ -31,7 +31,6 @@ namespace GownApi.Endpoints
                 CancellationToken ct
                 ) =>
             {
-                
                 if (request.PayAmount <= 0 || string.IsNullOrWhiteSpace(request.OrderNo))
                 {
                     logger.LogWarning("Invalid create-payment request:Amount={PayAmount}, OrderNo={OrderNumber}",
@@ -53,6 +52,7 @@ namespace GownApi.Endpoints
 
                 var orderNo = request.OrderNo.Trim();
                 var merchantSession = orderNo;
+                var merchantReference = orderNo;
                 httpContext.Items["OrderNo"] = orderNo;
 
                 using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo))
@@ -72,7 +72,8 @@ namespace GownApi.Endpoints
                             { "pstn_gi", gatewayId },
                             { "pstn_am", request.PayAmount.ToString(CultureInfo.InvariantCulture) },
                             { "pstn_ms", merchantSession },
-                            { "pstn_nr", "t" }
+                            { "pstn_nr", "t" },
+                            { "pstn_mr", merchantReference }
                         };
 
                         using var response = await httpClient.PostAsync(
@@ -88,7 +89,7 @@ namespace GownApi.Endpoints
                         {
                             logger.LogWarning("Paystation init failed. StatusCode={StatusCode}, RedirectUrlEmpty={RedirectEmpty}, BodySnippet={BodySnippet}",
                                 (int)response.StatusCode,
-                                string.IsNullOrWhiteSpace(redirectUrl),
+                                redirectUrl,
                                 SafeSnippet(responseString, 6000));
 
                             try
@@ -99,6 +100,7 @@ namespace GownApi.Endpoints
                                 ReferenceNo: orderNo,
                                 TxnId: $"http:{(int)response.StatusCode}",
                                 OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                //OccurredAt: DateTimeOffset.UtcNow
                                  ));
                             }
                             catch (Exception enqueueEx)
@@ -109,7 +111,11 @@ namespace GownApi.Endpoints
                             return Results.Problem("Failed to initiate payment.", statusCode: 502);
                         }
 
-                        logger.LogInformation("Paystation init success. RedirectUrl={RedirectUrl}", redirectUrl);
+                        logger.LogInformation("Paystation init success. StatusCode={StatusCode}, RedirectUrl={RedirectUrl}, BodySnippet={BodySnippet}",
+                              (int)response.StatusCode,
+                              string.IsNullOrWhiteSpace(redirectUrl),
+                              SafeSnippet(responseString, 6000));
+
                         return Results.Ok(new { redirectUrl });
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -130,6 +136,7 @@ namespace GownApi.Endpoints
                                 ReferenceNo: orderNo,
                                 TxnId: "upstream-timeout",
                                 OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                            //OccurredAt: DateTimeOffset.UtcNow
                             ));
                         }
                         catch (Exception enqueueEx)
@@ -151,6 +158,7 @@ namespace GownApi.Endpoints
                                 ReferenceNo: orderNo,
                                 TxnId: ex.GetType().Name,
                                 OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                //OccurredAt: DateTimeOffset.UtcNow
                                 ));  
                         }
                         catch (Exception enqueueEx)
@@ -253,6 +261,9 @@ namespace GownApi.Endpoints
                         logger.LogInformation("Paystation notify response: {Resp}", "NO_ORDER_BY_REFERENCE");
                         return Results.Ok("NO_ORDER_BY_REFERENCE");
                     }
+
+                    order.PaymentEc = ec;
+                    order.PaymentEm = em;
 
                     using (Serilog.Context.LogContext.PushProperty("OrderId", order.Id))
                     {
