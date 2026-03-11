@@ -43,7 +43,7 @@ namespace GownApi.Endpoints
                 var paystationUrl = settings.BaseUrl;
                 var paystationId = settings.PaystationId;
                 var gatewayId = settings.GatewayId;
-                var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
+                //var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
 
                 if (string.IsNullOrWhiteSpace(paystationId) || string.IsNullOrWhiteSpace(gatewayId) || string.IsNullOrWhiteSpace(paystationUrl))
                 {
@@ -98,7 +98,8 @@ namespace GownApi.Endpoints
                                 OrderId: null,
                                 ReferenceNo: orderNo,
                                 TxnId: $"http:{(int)response.StatusCode}",
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                //OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                    OccurredAt: DateTimeOffset.UtcNow
                                  ));
                             }
                             catch (Exception enqueueEx)
@@ -129,7 +130,8 @@ namespace GownApi.Endpoints
                                 OrderId: null,
                                 ReferenceNo: orderNo,
                                 TxnId: "upstream-timeout",
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                //OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                OccurredAt: DateTimeOffset.UtcNow
                             ));
                         }
                         catch (Exception enqueueEx)
@@ -150,7 +152,8 @@ namespace GownApi.Endpoints
                                 OrderId: null,
                                 ReferenceNo: orderNo,
                                 TxnId: ex.GetType().Name,
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                //OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                OccurredAt: DateTimeOffset.UtcNow
                                 ));  
                         }
                         catch (Exception enqueueEx)
@@ -172,7 +175,7 @@ namespace GownApi.Endpoints
                 req.EnableBuffering();
 
                 string raw;
-                var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
+                //var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
                 using (var reader = new StreamReader(req.Body, Encoding.UTF8, leaveOpen: true))
                 {
                     raw = await reader.ReadToEndAsync();
@@ -298,7 +301,8 @@ namespace GownApi.Endpoints
                                 OrderId: order.Id,
                                 ReferenceNo: order.ReferenceNo ?? merchantSession ?? order.Id.ToString(),
                                 TxnId: txnId,
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                //OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                OccurredAt: DateTimeOffset.UtcNow
                             ));
 
                             logger.LogInformation("PaymentCompleted job enqueued. OrderId={OrderId}, Ref={Ref}, TxnId={TxnId}",
