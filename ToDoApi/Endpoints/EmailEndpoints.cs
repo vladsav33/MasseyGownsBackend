@@ -26,6 +26,8 @@ namespace GownApi.Endpoints
 
                 if (string.IsNullOrWhiteSpace(expectedKey) || providedKey != expectedKey)
                 {
+                    logger.LogWarning("Expected Key={key}", expectedKey);
+                    logger.LogWarning("Provided Key={key}", providedKey);
                     logger.LogWarning("RenderPaymentReceipt unauthorized. OrderId={OrderId}", orderId);
                     return Results.Unauthorized();
                 }
