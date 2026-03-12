@@ -13,7 +13,7 @@
         public string Postcode { get; set; }
         public string Country { get; set; }
         public string Phone { get; set; }
-        public string Mobile { get; set; }
+        public decimal OrderAmount { get; set; }
         public int StudentId { get; set; }
         public string? Message { get; set; }
         public SelectedItemOut[] Items { get; set; }
