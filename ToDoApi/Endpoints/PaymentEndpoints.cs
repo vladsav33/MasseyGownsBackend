@@ -222,7 +222,7 @@ namespace GownApi.Endpoints
                 var requestTime = Get("TransactionTime") ?? Get("PaymentRequestTime");
                 var receiptTime = Get("DigitalOrderTime") ?? Get("DigitalReceiptTime");
                 var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var cents) ? cents : 0;
-                var purchaseAmount = purchaseAmountCents / 100m;
+                //var purchaseAmount = purchaseAmountCents / 100m;
                 var receiptNumber = Get("ReturnReceiptNumber");
 
                 using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo ?? ""))
@@ -232,8 +232,8 @@ namespace GownApi.Endpoints
                 using (Serilog.Context.LogContext.PushProperty("AmountCents", purchaseAmountCents))
                 using (Serilog.Context.LogContext.PushProperty("ReceiptNo", receiptNumber ?? ""))
                 {
-                    logger.LogInformation("Paystation notify received. ec={EC}, em={EM}, requestTime={RequestTime}, receiptTime={ReceiptTime},amount={Amount}, receipt={Receipt}",
-                        ec, em, requestTime, receiptTime, purchaseAmount, receiptNumber);
+                    logger.LogInformation("Paystation notify received. ec={EC}, em={EM}, requestTime={RequestTime}, receiptTime={ReceiptTime},amountcents={Amount}, receipt={Receipt}",
+                        ec, em, requestTime, receiptTime, purchaseAmountCents, receiptNumber);
 
                     if (string.IsNullOrWhiteSpace(merchantSession))
                     {
@@ -271,7 +271,7 @@ namespace GownApi.Endpoints
 
                         if (ec == 0)
                         {
-                            order.AmountPaid = purchaseAmountCents / 100m;
+                            order.AmountPaid = purchaseAmountCents;
                             //Original Paystation payment transaction id for future refunds
                             order.PaymentTxnId = txnId;
                         }
@@ -285,7 +285,7 @@ namespace GownApi.Endpoints
                             await db.SaveChangesAsync();
 
                             // confirm saved
-                            logger.LogInformation("Order payment saved. OrderId={OrderId}, Paid={Paid}, AmountPaid={AmountPaid}, PaymentTxnId={PaymentTxnId}",
+                            logger.LogInformation("Order payment saved. OrderId={OrderId}, Paid={Paid}, AmountPaidCents={AmountPaid}, PaymentTxnId={PaymentTxnId}",
                                 order.Id, order.Paid, order.AmountPaid, order.PaymentTxnId);
                         }
                         catch (Exception ex)

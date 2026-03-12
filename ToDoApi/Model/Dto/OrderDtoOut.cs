@@ -38,7 +38,6 @@
         public DateOnly? PayBy { get; set; }
         public int? Status { get; set; }
         public string? ReferenceNo { get; set; }
-
         public decimal? RefundedAmount { get; set; }// Added for refund details
         public string? RefundTxnId { get; set; }
         public DateTime? RefundedAt { get; set; }
