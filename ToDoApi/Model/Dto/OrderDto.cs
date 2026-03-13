@@ -8,10 +8,12 @@
         public string Email { get; set; }
         public string Address { get; set; }
         public string City { get; set; }
+        public int? PaymentEc { get; set; }
+        public string? PaymentEm { get; set; }
         public string Postcode { get; set; }
         public string Country { get; set; }
         public string Phone { get; set; }
-        public string Mobile { get; set; }
+        public decimal OrderAmount { get; set; }
         public int StudentId { get; set; }
         public string? Message { get; set; }
         public SelectedItem[] Items { get; set; }
