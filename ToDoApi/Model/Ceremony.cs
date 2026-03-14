@@ -41,7 +41,7 @@ public partial class Ceremony
 
     public string? InvoiceEmail { get; set; }
 
-    public string? PriceCode { get; set; }
+    public int? PriceCode { get; set; }
 
     public decimal? Freight { get; set; }
 

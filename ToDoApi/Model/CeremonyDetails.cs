@@ -24,7 +24,7 @@
         public string? Phone { get; set; }
         public string? Email { get; set; }
         public string? InvoiceEmail { get; set; }
-        public string? PriceCode { get; set; }
+        public int? PriceCode { get; set; }
         public decimal? Freight { get; set; }
         public string? CollectionTime { get; set; }
         public string? Content { get; set; }
