@@ -40,7 +40,7 @@ namespace GownApi
         public DbSet<CeremonyImport> CeremonyImport { get; set; }
         public DbSet<HiredNotGraduated> hiredNotGraduated { get; set; }
         public DbSet<GraduatedNotHired> graduatedNotHired { get; set; }
-
+        public DbSet<EmailQueueItems> EmailQueueItems { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

@@ -1,4 +1,5 @@
 ﻿using GownApi.Model;
+using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
@@ -128,7 +129,137 @@ namespace GownApi.Endpoints
                     logger.LogError(ex, "Failed to render front-end receipt. OrderId={OrderId}", orderId);
                     return Results.Problem("Failed to render receipt.");
                 }
-            });    
+            });
+
+            app.MapPost("/api/email/queue/mark-processing", async (
+                MarkEmailProcessingRequest request,
+                HttpRequest req,
+                IConfiguration config,
+                GownDb db,
+                ILogger<Program> logger) =>
+            {
+                var expectedKey = config["InternalEmail:Key"];
+                var providedKey = req.Headers["X-Internal-Key"].ToString();
+
+                if (string.IsNullOrWhiteSpace(expectedKey) || providedKey != expectedKey)
+                {
+                    logger.LogWarning("MarkEmailProcessing unauthorized. EmailId={EmailId}",
+                        request.EmailQueueItemId);
+                    return Results.Unauthorized();
+                }
+
+                var emailQueueItem = await db.EmailQueueItems.FirstOrDefaultAsync(x => x.Id == request.EmailQueueItemId && x.Status == EmailStatus.Pending);
+
+                if (emailQueueItem == null)
+                {
+                    logger.LogWarning("EmailQueueItem not found. EmailQueueItemId={EmailQueueItemId}",request.EmailQueueItemId);
+                    return Results.NotFound("Email queue item not found.");
+                }
+
+                emailQueueItem.Status = EmailStatus.Processing;
+                emailQueueItem.ProcessingStartedAt = DateTime.UtcNow;
+
+                await db.SaveChangesAsync();
+
+                return Results.Ok(new { emailQueueItem.Id });
+            });
+
+            app.MapPost("/api/email/queue/mark-sent", async (
+                MarkEmailSentRequest request,
+                HttpRequest req,
+                IConfiguration config,
+                GownDb db,
+                ILogger<Program> logger) =>
+            {
+                var expectedKey = config["InternalEmail:Key"];
+                var providedKey = req.Headers["X-Internal-Key"].ToString();
+
+                if (string.IsNullOrWhiteSpace(expectedKey) || providedKey != expectedKey)
+                {
+                    logger.LogWarning("MarkEmailSent unauthorized. EmailQueueItemId={EmailQueueItemId}",
+                        request.EmailQueueItemId);
+                    return Results.Unauthorized();
+                }
+
+                var emailQueueItem = await db.EmailQueueItems
+                    .FirstOrDefaultAsync(x => x.Id == request.EmailQueueItemId);
+
+                if (emailQueueItem == null)
+                {
+                    logger.LogWarning("EmailQueueItem not found. EmailQueueItemId={EmailQueueItemId}",
+                        request.EmailQueueItemId);
+                    return Results.NotFound("Email queue item not found.");
+                }
+
+                emailQueueItem.ToEmail = request.ToEmail;
+                emailQueueItem.Subject = request.Subject;
+                emailQueueItem.EmailBody = request.EmailBody;
+                emailQueueItem.Status = EmailStatus.Sent;
+                emailQueueItem.SentAt = DateTime.UtcNow;
+                emailQueueItem.LastError = null;
+
+                await db.SaveChangesAsync();
+
+                return Results.Ok(new { emailQueueItem.Id });
+            });
+
+            app.MapPost("/api/email/queue/mark-failed", async (
+                MarkEmailFailedRequest request,
+                HttpRequest req,
+                IConfiguration config,
+                GownDb db,
+                ILogger<Program> logger) =>
+            {
+                var expectedKey = config["InternalEmail:Key"];
+                var providedKey = req.Headers["X-Internal-Key"].ToString();
+
+                if (string.IsNullOrWhiteSpace(expectedKey) || providedKey != expectedKey)
+                {
+                    logger.LogWarning("MarkEmailFailed unauthorized. EmailQueueItemId={EmailQueueItemId}",
+                        request.EmailQueueItemId);
+                    return Results.Unauthorized();
+                }
+
+                var emailQueueItem = await db.EmailQueueItems
+                    .FirstOrDefaultAsync(x => x.Id == request.EmailQueueItemId);
+
+                if (emailQueueItem == null)
+                {
+                    logger.LogWarning("EmailQueueItem not found. EmailQueueItemId={EmailQueueItemId}",
+                        request.EmailQueueItemId);
+                    return Results.NotFound("Email queue item not found.");
+                }
+
+                emailQueueItem.Status = EmailStatus.Failed;
+                emailQueueItem.LastError = request.LastError;
+                await db.SaveChangesAsync();
+
+                return Results.Ok(new { emailQueueItem.Id });
+            });
+
+            app.MapPost("/api/internal/payment-reminder/run", async (
+                HttpRequest req,
+                IConfiguration config,
+                PaymentReminderJob job,
+                ILogger<Program> logger,
+                CancellationToken ct) =>
+            {
+                var expectedKey = config["InternalEmail:Key"];
+                var providedKey = req.Headers["X-Internal-Key"].ToString();
+
+                if (string.IsNullOrWhiteSpace(expectedKey) || providedKey != expectedKey)
+                {
+                    logger.LogWarning("Manual PaymentReminderJob run unauthorized.");
+                    return Results.Unauthorized();
+                }
+
+                await job.RunAsync(ct);
+
+                return Results.Ok(new
+                {
+                    message = "PaymentReminderJob completed."
+                });
+            });
         }
         
         //Shared rendering function

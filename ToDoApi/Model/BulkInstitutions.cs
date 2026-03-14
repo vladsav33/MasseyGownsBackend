@@ -20,6 +20,6 @@
         public string? Email { get; set; }
         public string? InvoiceEmail { get; set; }
         public string? PriceCode { get; set; }
-        public float? Freight { get; set; }
+        public decimal? Freight { get; set; }
     }
 }

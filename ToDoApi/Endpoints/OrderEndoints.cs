@@ -90,6 +90,7 @@ namespace GownApi.Endpoints
             app.MapPost("/orders", async (OrderDto orderDto, GownDb db, ILogger<Program> logger, HttpContext httpContext, IQueueJobPublisher publisher) =>
             {
                 var order = OrderMapper.FromDto(orderDto);
+                order.CreatedAt = DateTime.UtcNow;
 
                 db.orders.Add(order);
                     await db.SaveChangesAsync();
@@ -160,7 +161,8 @@ namespace GownApi.Endpoints
                               OrderId: updatedOrder.Id,
                               ReferenceNo: orderNo,
                               TxnId: updatedOrder.PurchaseOrder,
-                              OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                              OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                              EmailQueueItemId: null
                           ));
                         }
                         catch (Exception ex)
