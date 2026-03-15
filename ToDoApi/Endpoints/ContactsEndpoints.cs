@@ -34,7 +34,8 @@ namespace GownApi.Endpoints
                       OrderId: null,
                       ReferenceNo: contact.Subject,
                       TxnId: contact.Query,
-                      OccurredAt: TimeZoneInfo.ConvertTime(contact.CreatedAt, nzTz)
+                      OccurredAt: TimeZoneInfo.ConvertTime(contact.CreatedAt, nzTz),
+                      EmailQueueItemId: null
                   ));
                 }
                 catch (Exception ex)

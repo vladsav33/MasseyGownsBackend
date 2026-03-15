@@ -20,6 +20,7 @@
         public int? PaymentMethod { get; set; }
         public string? PurchaseOrder { get; set; }
         public DateOnly OrderDate { get; set; }
+        public DateTime? CreatedAt { get; set; }
         public int? CeremonyId { get; set; }
         //public string? Ceremony { get; set; }
         public int? DegreeId { get; set; }
@@ -37,7 +38,6 @@
         public int? Status { get; set; }
         public string? ReferenceNo { get; set; }
         public string? PaymentTxnId { get; set; }
-
         public bool Refunded { get; set; }
         public decimal? RefundedAmount { get; set; }
         public string? RefundTxnId { get; set; }
@@ -46,5 +46,7 @@
         public int? RefundLastEc { get; set; }
         public string? RefundLastEm { get; set; }
         public RefundStatusCode RefundStatusCode { get; set; } = RefundStatusCode.None;
+        public DateTime? PaymentReminder1SentAt { get; set; }
+        public DateTime? PaymentReminder2SentAt { get; set; }
     }
 }

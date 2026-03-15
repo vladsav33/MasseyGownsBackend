@@ -43,7 +43,7 @@ else
 // Email service
 
 builder.Services.AddScoped<IPdfService, PdfService>();
-builder.Services.AddSingleton<IQueueJobPublisher, QueueJobPublisher>();
+builder.Services.AddScoped<IQueueJobPublisher, QueueJobPublisher>();
 
 
 var connectionString = builder.Configuration.GetConnectionString("GownDb");
@@ -113,6 +113,8 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<PaystationPayMeService>();
+builder.Services.AddScoped<PaymentReminderJob>();
 builder.Services.AddHttpClient<PaystationQuickLookupClient>();
 builder.Services.AddHttpClient("Paystation", c =>
 {

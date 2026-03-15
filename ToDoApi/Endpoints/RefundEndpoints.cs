@@ -39,6 +39,13 @@ namespace GownApi.Endpoints
 
                 if (order == null) return Results.NotFound("Order not found.");
                 // Refunded / in progress / requested are not allowed to request again
+
+                if (request.RefundAmount > order.AmountPaid)
+                    return Results.BadRequest("Refund amount cannot exceed amount paid.");
+
+                if (order.Paid is not true)
+                    return Results.BadRequest("Only paid orders can be refunded.");
+
                 if (order.Refunded || order.RefundStatusCode == RefundStatusCode.Completed)
                     return Results.Conflict("Order already refunded.");
 
@@ -117,6 +124,7 @@ namespace GownApi.Endpoints
                 var paystationId = settings.PaystationId;
                 var gatewayId = settings.GatewayId;
                 var hmacKey = settings.HmacKey;
+                var refundUrl = settings.RefundUrl;
 
                 if (string.IsNullOrWhiteSpace(paystationId) || string.IsNullOrWhiteSpace(gatewayId))
                     return Results.Problem("Paystation config missing (PaystationId/GatewayId).");
@@ -128,7 +136,8 @@ namespace GownApi.Endpoints
                 if (decimal.Round(request.RefundAmount, 2) != request.RefundAmount)
                     return Results.BadRequest("Refund amount must have at most 2 decimal places.");
 
-                var amountCents = decimal.ToInt32(request.RefundAmount * 100m);
+                //var amountCents = decimal.ToInt32(request.RefundAmount * 100m);
+                var amountCents = Convert.ToInt32(Math.Round(request.RefundAmount * 100m, MidpointRounding.AwayFromZero));
 
                 // Merchant session
                 var merchantSession = order.ReferenceNo.Trim();
@@ -176,7 +185,7 @@ namespace GownApi.Endpoints
 
                 var hmacHex = HmacSha512Hex(hmacKey, stringToHash);
 
-                var url = BuildRefundUrl(unixTs, hmacHex);
+                var url = BuildRefundUrl(refundUrl, unixTs, hmacHex);
 
                 string respText;
                 HttpStatusCode httpStatus;
@@ -221,7 +230,8 @@ namespace GownApi.Endpoints
                         OrderId: order.Id,
                         ReferenceNo: merchantSession,
                         TxnId: order.RefundTxnId,
-                        OccurredAt: order.RefundedAt
+                        OccurredAt: order.RefundedAt,
+                        EmailQueueItemId: null
                     ));
 
                     return Results.Ok(new
@@ -249,7 +259,8 @@ namespace GownApi.Endpoints
                         OrderId: order.Id,
                         ReferenceNo: merchantSession,
                         TxnId: order.RefundTxnId,
-                        OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                        OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                        EmailQueueItemId: null
                     ));
 
                     return Results.Ok(new
@@ -311,10 +322,10 @@ namespace GownApi.Endpoints
             return Convert.ToHexString(hash).ToLowerInvariant();
         }
 
-        private static string BuildRefundUrl(string unixTs, string hmacHex)
+        private static string BuildRefundUrl(string refundURL, string unixTs, string hmacHex)
         {
             return
-                "https://www.paystation.co.nz/direct/paystation.dll"
+                refundURL
                 + $"?pstn_HMACTimestamp={WebUtility.UrlEncode(unixTs)}"
                 + $"&pstn_HMAC={WebUtility.UrlEncode(hmacHex)}";
         }

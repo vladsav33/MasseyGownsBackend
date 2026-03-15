@@ -99,7 +99,8 @@ namespace GownApi.Endpoints
                                 OrderId: null,
                                 ReferenceNo: orderNo,
                                 TxnId: $"http:{(int)response.StatusCode}",
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                                EmailQueueItemId: null
                                 //OccurredAt: DateTimeOffset.UtcNow
                                  ));
                             }
@@ -135,7 +136,8 @@ namespace GownApi.Endpoints
                                 OrderId: null,
                                 ReferenceNo: orderNo,
                                 TxnId: "upstream-timeout",
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                                EmailQueueItemId: null
                             //OccurredAt: DateTimeOffset.UtcNow
                             ));
                         }
@@ -157,7 +159,8 @@ namespace GownApi.Endpoints
                                 OrderId: null,
                                 ReferenceNo: orderNo,
                                 TxnId: ex.GetType().Name,
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                                EmailQueueItemId: null
                                 //OccurredAt: DateTimeOffset.UtcNow
                                 ));  
                         }
@@ -218,11 +221,12 @@ namespace GownApi.Endpoints
                             ?? Get("ti");
 
                 var merchantSession = Get("MerchantSession")?.Trim();
+                var merchantReference = Get("MerchantReference")?.Trim();
                 var orderNo = merchantSession;
                 var requestTime = Get("TransactionTime") ?? Get("PaymentRequestTime");
                 var receiptTime = Get("DigitalOrderTime") ?? Get("DigitalReceiptTime");
                 var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var cents) ? cents : 0;
-                //var purchaseAmount = purchaseAmountCents / 100m;
+                var purchaseAmount = purchaseAmountCents / 100m;
                 var receiptNumber = Get("ReturnReceiptNumber");
 
                 using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo ?? ""))
@@ -246,18 +250,18 @@ namespace GownApi.Endpoints
                     try
                     {
                         order = await db.orders
-                            .FirstOrDefaultAsync(o => o.ReferenceNo == merchantSession);
+                            .FirstOrDefaultAsync(o => o.Id == Convert.ToInt32(merchantReference));
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Failed to load order by ReferenceNo={ReferenceNo}", merchantSession);
+                        logger.LogError(ex, "Failed to load order by MerchantReference={MerchantReference}", merchantReference);
                         logger.LogInformation("Paystation notify response: {Resp}", "DB_READ_FAILED");
                         return Results.Ok("DB_READ_FAILED");
                     }
 
                     if (order == null)
                     {
-                        logger.LogWarning("No order found by ReferenceNo(MerchantSession)={MerchantSession}", merchantSession);
+                        logger.LogWarning("No order found by ReferenceNo(MerchantReference)={MerchantReference}", merchantReference);
                         logger.LogInformation("Paystation notify response: {Resp}", "NO_ORDER_BY_REFERENCE");
                         return Results.Ok("NO_ORDER_BY_REFERENCE");
                     }
@@ -271,7 +275,7 @@ namespace GownApi.Endpoints
 
                         if (ec == 0)
                         {
-                            order.AmountPaid = purchaseAmountCents;
+                            order.AmountPaid = purchaseAmount;
                             //Original Paystation payment transaction id for future refunds
                             order.PaymentTxnId = txnId;
                         }
@@ -309,7 +313,8 @@ namespace GownApi.Endpoints
                                 OrderId: order.Id,
                                 ReferenceNo: order.ReferenceNo ?? merchantSession ?? order.Id.ToString(),
                                 TxnId: txnId,
-                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz)
+                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                                EmailQueueItemId: null
                             ));
 
                             logger.LogInformation("PaymentCompleted job enqueued. OrderId={OrderId}, Ref={Ref}, TxnId={TxnId}",

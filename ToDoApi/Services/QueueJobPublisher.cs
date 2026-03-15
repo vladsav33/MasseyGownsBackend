@@ -1,14 +1,16 @@
 ﻿using Azure.Storage.Queues;
+using GownApi.Model;
 using System.Text.Json;
 
 namespace GownApi.Services;
 
 public record EmailJob(
-    string Type,         // "PaymentCompleted" | "RefundCompleted"
-    int? OrderId,        //Null for ContactQuery email jobs
-    string? ReferenceNo, //Null for ContactQuery email jobs
-    string? TxnId,       //Null for ContactQuery email and & purchase order jobs
-    DateTimeOffset? OccurredAt
+    string Type,        
+    int? OrderId,      // contact query email has no order id 
+    string? ReferenceNo, 
+    string? TxnId,       
+    DateTimeOffset? OccurredAt,
+    int? EmailQueueItemId
 );
 
 public interface IQueueJobPublisher
@@ -19,11 +21,14 @@ public interface IQueueJobPublisher
 public class QueueJobPublisher : IQueueJobPublisher
 {
     private readonly QueueClient _queue;
+    private readonly GownDb _db;
 
-    public QueueJobPublisher(IConfiguration config)
+    public QueueJobPublisher(IConfiguration config, GownDb db)
     {
+        
         var conn = config["BlobStorage:ConnectionString"];
         var queueName = config["BlobStorage:EmailJobsQueueName"] ?? "email-jobs";
+        _db = db;
 
         if (string.IsNullOrWhiteSpace(conn))
             throw new InvalidOperationException("BlobStorage:ConnectionString not configured.");
@@ -38,7 +43,34 @@ public class QueueJobPublisher : IQueueJobPublisher
 
     public async Task EnqueueEmailJobAsync(EmailJob job, CancellationToken ct = default)
     {
-        var json = JsonSerializer.Serialize(job);
+        string? paymeUrl = null;
+
+        if (job.Type == "PaymentReminder1" || job.Type == "PaymentReminder2")
+        {
+            paymeUrl = job.TxnId;
+        }
+
+        var emailQueueItem = new EmailQueueItems
+        {
+            OrderId = job.OrderId,
+            EmailType = job.Type,
+            PayMeUrl = paymeUrl,
+            EmailBody = null,
+            Status = EmailStatus.Pending,
+            AttemptCount = 0,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.EmailQueueItems.Add(emailQueueItem);
+        await _db.SaveChangesAsync(ct);
+
+        var jobToSend = job with
+        {
+            EmailQueueItemId = emailQueueItem.Id
+        };
+
+        var json = JsonSerializer.Serialize(jobToSend);
         await _queue.SendMessageAsync(json, cancellationToken: ct);
     }
+
 }

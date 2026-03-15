@@ -8,7 +8,7 @@
         public string? FitName { get; set; }
         public string Size { get; set; }
         public string? Labelsize { get; set; }
-        public float? Price { get; set; }
+        public decimal? Price { get; set; }
 
     }
 }
