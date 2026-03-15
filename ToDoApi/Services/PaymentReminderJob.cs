@@ -7,12 +7,14 @@ namespace GownApi.Services
         private readonly GownDb _db;
         private readonly IQueueJobPublisher _publisher;
         private readonly PaystationPayMeService _paystationPayMeService;
+        private readonly ILogger<PaymentReminderJob> _logger;
 
-        public PaymentReminderJob(GownDb db, IQueueJobPublisher publisher, PaystationPayMeService paystationPayMeService)
+        public PaymentReminderJob(GownDb db, IQueueJobPublisher publisher, PaystationPayMeService paystationPayMeService, ILogger<PaymentReminderJob> logger)
         {
             _db = db;
             _publisher = publisher;
             _paystationPayMeService = paystationPayMeService;
+            _logger = logger;
         }
 
         public async Task RunAsync(CancellationToken ct = default)
@@ -41,8 +43,13 @@ namespace GownApi.Services
                 o.Email != "" &&
                 o.CreatedAt != null &&
                 o.PaymentReminder2SentAt == null &&
+                o.PaymentReminder1SentAt != null &&
                 o.CreatedAt <= secondReminderThreshold)
                 .ToListAsync(ct);
+
+            _logger.LogInformation("PaymentReminderJob started at {Now}", now);
+            _logger.LogInformation("First reminder candidates: {Count}", firstReminderOrders.Count);
+            _logger.LogInformation("Second reminder candidates: {Count}", secondReminderOrders.Count);
 
             foreach (var order in firstReminderOrders)
             {
@@ -58,6 +65,8 @@ namespace GownApi.Services
                 ), ct);
 
                 order.PaymentReminder1SentAt = DateTime.UtcNow;
+
+                _logger.LogInformation("Enqueued PaymentReminder1 for OrderId={OrderId}", order.Id);
             }
 
             await _db.SaveChangesAsync(ct);
@@ -71,6 +80,7 @@ namespace GownApi.Services
 
                 if (string.IsNullOrWhiteSpace(firstReminderEmail?.PayMeUrl))
                 {
+                    _logger.LogWarning("Skipped PaymentReminder2 for OrderId={OrderId} because PayMeUrl was not found.", order.Id);
                     continue;
                 }
 
@@ -84,9 +94,12 @@ namespace GownApi.Services
                 ), ct);
 
                 order.PaymentReminder2SentAt = DateTime.UtcNow;
+                _logger.LogInformation("Enqueued PaymentReminder2 for OrderId={OrderId}", order.Id);
             }
 
             await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation("PaymentReminderJob completed at {Now}", DateTime.UtcNow);
         }
     }
 }
