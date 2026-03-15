@@ -81,7 +81,7 @@ namespace GownApi.Endpoints
                     }
                 });
 
-            app.MapPut("/admin/ceremonies/{id}", async (int id, Ceremonies updatedCeremony, GownDb db, ILogger<Program> logger) =>
+            app.MapPut("/admin/ceremonies/{id}", async (int id, CeremonyDetails updatedCeremony, GownDb db, ILogger<Program> logger) =>
             {
                 var jsonBody = JsonSerializer.Serialize(updatedCeremony, new JsonSerializerOptions
                 {
@@ -98,7 +98,7 @@ namespace GownApi.Endpoints
                     return Results.NotFound();
 
                 var configExpression = new MapperConfigurationExpression();
-                configExpression.CreateMap<Ceremonies, Ceremonies>()
+                configExpression.CreateMap<CeremonyDetails, Ceremonies>()
                     .ForAllMembers(opt => opt.Condition((src, dest, srcMember) => srcMember != null));
 
                 var config = new MapperConfiguration(configExpression);

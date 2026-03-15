@@ -71,6 +71,23 @@ namespace GownApi.Endpoints
 
                 return Results.Ok(result);
             });
+
+            _ = app.MapGet("/admin/ordersbyceremony/{id}", async (int id, GownDb db) =>
+            {
+                var sql = @"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.payment_ec, o.payment_em,o.postcode, o.country, o.phone,
+                                      o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
+                                      c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
+                                      o.amount_owning, o.donation, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refunded_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at
+                                      FROM orders o
+                                      LEFT JOIN ceremonies c
+                                      ON o.ceremony_id = c.id
+                                      WHERE o.ceremony_id = @id AND o.reference_no is not null
+                                      ORDER BY o.reference_no DESC";
+                var param = new NpgsqlParameter("@id", id);
+                var result = await db.orderGets.FromSqlRaw(sql, param).ToListAsync();
+                return Results.Ok(result);
+            });
         }
     }
 }

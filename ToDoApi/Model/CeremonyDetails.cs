@@ -25,17 +25,17 @@
         public string? Email { get; set; }
         public string? InvoiceEmail { get; set; }
         public int? PriceCode { get; set; }
-        public float? Freight { get; set; }
+        public decimal? Freight { get; set; }
         public string? CollectionTime { get; set; }
         public string? Content { get; set; }
         public int hat_count { get; set; }
         public int hood_count { get; set; }
         public int gown_count { get; set; }
         public int ucol_count { get; set; }
-        public float? hood {get; set; }
-        public float? gown {get; set; }
-        public float? hat {get; set; }
-        public float? xtra_hood {get; set; }
-        public float? ucol_sash {get; set; }
+        public decimal? hood {get; set; }
+        public decimal? gown {get; set; }
+        public decimal? hat {get; set; }
+        public decimal? xtra_hood {get; set; }
+        public decimal? ucol_sash {get; set; }
     }
 }
