@@ -1,5 +1,6 @@
 ﻿using GownApi.Model;
 using GownApi.Model.Dto;
+using GownApi.Services;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -86,7 +87,16 @@ namespace GownApi.Endpoints
                                       ORDER BY o.reference_no DESC";
                 var param = new NpgsqlParameter("@id", id);
                 var result = await db.orderGets.FromSqlRaw(sql, param).ToListAsync();
-                return Results.Ok(result);
+
+                var resultList = new List<OrderDtoOut>();
+
+                foreach (var res in result)
+                {
+                    var order = await OrderMapper.ToDtoOut(res, db);
+                    resultList.Add(order);
+                }
+
+                return Results.Ok(resultList);
             });
         }
     }
