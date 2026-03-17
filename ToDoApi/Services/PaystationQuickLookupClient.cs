@@ -17,9 +17,6 @@ namespace GownApi.Services.Paystation
         private readonly HttpClient _httpClient;
         private readonly PaystationOptions _options;
 
-        // Per Paystation docs/screenshot: Quick lookup URL
-        private const string LookupUrl = "https://payments.paystation.co.nz/lookup/";
-
         public PaystationQuickLookupClient(
             HttpClient httpClient,
             IOptions<PaystationOptions> options)
@@ -36,8 +33,9 @@ namespace GownApi.Services.Paystation
             if (string.IsNullOrWhiteSpace(txnId))
                 throw new ArgumentException("txnId is required.", nameof(txnId));
 
-            var pi = GetPaystationIdOrThrow();
-            var hmacKey = GetHmacKeyOrThrow();
+            var pi = _options.PaystationId;
+            var hmacKey = _options.HmacKey;
+       
 
             var pairs = new List<KeyValuePair<string, string>>
             {
@@ -56,8 +54,8 @@ namespace GownApi.Services.Paystation
             if (string.IsNullOrWhiteSpace(merchantSession))
                 throw new ArgumentException("merchantSession is required.", nameof(merchantSession));
 
-            var pi = GetPaystationIdOrThrow();
-            var hmacKey = GetHmacKeyOrThrow();
+            var pi = _options.PaystationId;
+            var hmacKey = _options.HmacKey;
 
             var pairs = new List<KeyValuePair<string, string>>
             {
@@ -76,8 +74,8 @@ namespace GownApi.Services.Paystation
             if (string.IsNullOrWhiteSpace(txnId) && string.IsNullOrWhiteSpace(merchantSession))
                 throw new ArgumentException("Either txnId or merchantSession must be provided.");
 
-            var pi = GetPaystationIdOrThrow();
-            var hmacKey = GetHmacKeyOrThrow();
+            var pi = _options.PaystationId;
+            var hmacKey = _options.HmacKey;
 
             var pairs = new List<KeyValuePair<string, string>> { new("pi", pi) };
 
@@ -105,6 +103,7 @@ namespace GownApi.Services.Paystation
             var stringToHash = unixTs + "paystation" + bodyString;
 
             var hmacHex = HmacSha512Hex(hmacKey, stringToHash);
+            var LookupUrl = _options.LookupUrl;
 
             var url =
                 LookupUrl
@@ -118,21 +117,6 @@ namespace GownApi.Services.Paystation
             return xml;
         }
 
-        private string GetPaystationIdOrThrow()
-        {
-            var pi = _options.PaystationId;
-            if (string.IsNullOrWhiteSpace(pi))
-                throw new InvalidOperationException("PaystationId is missing in configuration (Paystation:PaystationId).");
-            return pi.Trim();
-        }
-
-        private string GetHmacKeyOrThrow()
-        {
-            var key = _options.HmacKey;
-            if (string.IsNullOrWhiteSpace(key))
-                throw new InvalidOperationException("HmacKey is missing in configuration (Paystation:HmacKey).");
-            return key;
-        }
 
         private static string HmacSha512Hex(string key, string data)
         {

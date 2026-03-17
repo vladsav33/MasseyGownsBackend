@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Drawing.Charts;
-using GownApi.Model;
+﻿using GownApi.Model;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -22,7 +21,7 @@ namespace GownApi.Endpoints
                 int orderId,
                 RefundRequest request,
                 GownDb db,
-                HttpContext http,
+                HttpContext httpContext,
                 ILogger<Program> logger) =>
             {
                 if (request.RefundAmount <= 0)
@@ -39,6 +38,15 @@ namespace GownApi.Endpoints
 
                 if (order == null) return Results.NotFound("Order not found.");
                 // Refunded / in progress / requested are not allowed to request again
+
+                var merchantreference = $"RREF{order.Id}";
+                httpContext.Items["MerchantReference"] = merchantreference; 
+
+                using(Serilog.Context.LogContext.PushProperty("MerchantReference", merchantreference))
+                {
+                    logger.LogInformation("Refund request initiated. OrderId={OrderId}, Amount={Amount}, By={By}",
+                        order.Id, request.RefundAmount, httpContext.User.Identity?.Name ?? "");
+                
 
                 if (request.RefundAmount > order.AmountPaid)
                     return Results.BadRequest("Refund amount cannot exceed amount paid.");
@@ -58,7 +66,7 @@ namespace GownApi.Endpoints
                 // write initial refund request status
                 order.RefundStatusCode = RefundStatusCode.Requested;
                 order.RefundedAmount = request.RefundAmount;
-                order.RefundedAt = null;
+                order.RefundInitiatedAt = null;
                 order.RefundTxnId = null;
                 order.RefundLastEc = null;
                 order.RefundLastEm = null;
@@ -73,7 +81,8 @@ namespace GownApi.Endpoints
                 }
 
                 logger.LogInformation("Refund requested. OrderId={OrderId}, Amount={Amount}, By={By}",
-                    order.Id, request.RefundAmount, http.User.Identity?.Name ?? "");
+                    order.Id, request.RefundAmount, httpContext.User.Identity?.Name ?? "");
+                }
 
                 return Results.Ok(new
                 {
@@ -107,6 +116,15 @@ namespace GownApi.Endpoints
                 }   
                 if (order == null) return Results.NotFound("Order not found.");
 
+                var merchantreference = $"RREF{order.Id}";
+                httpContext.Items["MerchantReference"] = merchantreference;
+
+                if (request.RefundAmount > order.AmountPaid)
+                    return Results.BadRequest("Refund amount cannot exceed amount paid.");
+
+                if (order.Paid is not true)
+                    return Results.BadRequest("Only paid orders can be refunded.");
+
                 // 1) Prevent duplicate refunds
                 if (order.Refunded || order.RefundStatusCode == RefundStatusCode.Completed)
                     return Results.Conflict("Order already refunded.");
@@ -114,6 +132,9 @@ namespace GownApi.Endpoints
                 // 2) Request -> Approve flow: only allowed if currently in "Requested" state
                 if (order.RefundStatusCode != RefundStatusCode.Requested)
                     return Results.Conflict($"Refund is not in requested state. Current={order.RefundStatusCode}");
+
+                if (request.RefundAmount != order.RefundedAmount)
+                    return Results.BadRequest("Approved refund amount must match requested amount.");
 
                 // 3) txn id needed for refund API call
                 if (string.IsNullOrWhiteSpace(order.PaymentTxnId))
@@ -154,7 +175,7 @@ namespace GownApi.Endpoints
                 order.RefundLastEm = null;
                 order.Refunded = false;
                 order.RefundedAmount = request.RefundAmount;
-                order.RefundedAt = null;
+                order.RefundInitiatedAt = null;
                 order.RefundTxnId = null;
 
                 try
@@ -209,31 +230,55 @@ namespace GownApi.Endpoints
                     return Results.Problem("Paystation refund call failed.");
                 }
 
-                logger.LogInformation("Paystation refund response. HttpStatus={HttpStatus}, BodySnippet={BodySnippet}",
-                    (int)httpStatus, SafeSnippet(respText, 3000));
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantreference))
+                {
+                    logger.LogInformation("Paystation refund response. HttpStatus={HttpStatus}, BodySnippet={BodySnippet}",
+                        (int)httpStatus, SafeSnippet(respText, 3000));
+                }
+
+                if (!((int)httpStatus >= 200 && (int)httpStatus < 300))
+                {
+                    order.RefundLastEc = -2;
+                    order.RefundLastEm = $"Paystation HTTP {(int)httpStatus}";
+                    order.RefundStatusCode = RefundStatusCode.Failed;
+                    await db.SaveChangesAsync();
+                    return Results.Problem($"Paystation returned HTTP {(int)httpStatus}.");
+                }
 
                 var (ec, em, refundTxnId,refundTxnTime) = ParsePaystationResponse(respText);
+                var parsedRefundInitiatedAtUtc = ParsePaystationTransactionTimeUtc(refundTxnTime);
 
                 order.RefundLastEc = ec;
                 order.RefundLastEm = em;
-
-                var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
+                var occurredAt = parsedRefundInitiatedAtUtc.HasValue? new DateTimeOffset(parsedRefundInitiatedAtUtc.Value): DateTimeOffset.UtcNow;
 
                 if (ec == 0)
                 {
                     order.RefundStatusCode = RefundStatusCode.Completed;
                     order.Refunded = true;
-                    order.RefundedAt = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz);
+                    order.RefundInitiatedAt = parsedRefundInitiatedAtUtc ?? DateTime.UtcNow;
                     order.RefundTxnId = string.IsNullOrWhiteSpace(refundTxnId) ? null : refundTxnId;
+                   
 
-                    await db.SaveChangesAsync();
+                    try
+                    {
+                        await db.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex,
+                            "Refund succeeded at Paystation but failed to persist locally. OrderId={OrderId}, RefundTxnId={RefundTxnId}",
+                            order.Id, order.RefundTxnId);
+
+                        return Results.Problem("Refund succeeded externally but local update failed. Please run refund sync.");
+                    }
 
                     await publisher.EnqueueEmailJobAsync(new EmailJob(
                         Type: "RefundCompleted",
                         OrderId: order.Id,
                         ReferenceNo: order.ReferenceNo,
                         TxnId: order.RefundTxnId,
-                        OccurredAt: order.RefundedAt,
+                        OccurredAt: occurredAt,
                         EmailQueueItemId: null
                     ));
 
@@ -243,7 +288,7 @@ namespace GownApi.Endpoints
                         amount = order.RefundedAmount,
                         paymentTxnId = order.PaymentTxnId,
                         refundTxnId = order.RefundTxnId,
-                        refundedAt = order.RefundedAt,
+                        refundInitiatedAt = order.RefundInitiatedAt,
                         ec,
                         em
                     });
@@ -262,7 +307,7 @@ namespace GownApi.Endpoints
                         OrderId: order.Id,
                         ReferenceNo: order.ReferenceNo,
                         TxnId: order.RefundTxnId,
-                        OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                        OccurredAt: DateTimeOffset.Now,
                         EmailQueueItemId: null
                     ));
 
@@ -413,6 +458,36 @@ namespace GownApi.Endpoints
             {
                 return (-1, null, null,null);
             }
+        }
+
+        private static DateTime? ParsePaystationTransactionTimeUtc(string? rawTime)
+        {
+            if (string.IsNullOrWhiteSpace(rawTime))
+                return null;
+
+            if (DateTime.TryParseExact(
+                rawTime,
+                "yyyy-MM-dd HH:mm:ss",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var dt))
+            {
+                TimeZoneInfo nzTz;
+                try
+                {
+                    nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
+                }
+                catch
+                {
+                    nzTz = TimeZoneInfo.FindSystemTimeZoneById("Pacific/Auckland");
+                }
+
+                var nzLocal = DateTime.SpecifyKind(dt, DateTimeKind.Unspecified);
+                var utc = TimeZoneInfo.ConvertTimeToUtc(nzLocal, nzTz);
+                return utc;
+            }
+
+            return null;
         }
     }
 }
