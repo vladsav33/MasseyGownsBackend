@@ -38,7 +38,7 @@
         public string? ReferenceNo { get; set; }
         public decimal? RefundedAmount { get; set; }// Added for refund details
         public string? RefundTxnId { get; set; }
-        public DateTime? RefundedAt { get; set; }
+        public DateTime? RefundInitiatedAt { get; set; }
         public DateTime? RefundEmailSentAt { get; set; }
         public string? PaymentTxnId { get; set; }
         public int? RefundLastEc { get; set; }
