@@ -140,10 +140,12 @@ namespace GownApi.Endpoints
                 var amountCents = Convert.ToInt32(Math.Round(request.RefundAmount * 100m, MidpointRounding.AwayFromZero));
 
                 // Merchant session
-                var merchantSession = order.ReferenceNo.Trim();
-                if (string.IsNullOrWhiteSpace(merchantSession)) 
-                    return Results.BadRequest("Paid order must have merchantSession.");
-                var refundMerchantSession = "Re" + merchantSession;
+                //var merchantSession = order.ReferenceNo.Trim();
+                //if (string.IsNullOrWhiteSpace(merchantSession)) 
+                  //  return Results.BadRequest("Paid order must have merchantSession.");
+                //var refundMerchantSession = "Re" + merchantSession;
+                var refundMerchantReference = $"RREF{order.Id}";
+                var refundMerchantSession = $"RREF{order.Id}-{Guid.NewGuid():N}";
 
 
                 // Set status to InProgress before calling Paystation, to prevent duplicate
@@ -173,7 +175,8 @@ namespace GownApi.Endpoints
                     gatewayId,
                     refundMerchantSession,
                     amountCents,
-                    order.PaymentTxnId
+                    order.PaymentTxnId,
+                    refundMerchantReference
                     );
 
                 var content = new FormUrlEncodedContent(pairs);
@@ -228,7 +231,7 @@ namespace GownApi.Endpoints
                     await publisher.EnqueueEmailJobAsync(new EmailJob(
                         Type: "RefundCompleted",
                         OrderId: order.Id,
-                        ReferenceNo: merchantSession,
+                        ReferenceNo: order.ReferenceNo,
                         TxnId: order.RefundTxnId,
                         OccurredAt: order.RefundedAt,
                         EmailQueueItemId: null
@@ -257,7 +260,7 @@ namespace GownApi.Endpoints
                     await publisher.EnqueueEmailJobAsync(new EmailJob(
                         Type: "RefundInProgress",
                         OrderId: order.Id,
-                        ReferenceNo: merchantSession,
+                        ReferenceNo: order.ReferenceNo,
                         TxnId: order.RefundTxnId,
                         OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
                         EmailQueueItemId: null
@@ -297,7 +300,9 @@ namespace GownApi.Endpoints
             string gatewayId,
             string merchantSession,
             int amountCents,
-            string paymentTxnId)
+            string paymentTxnId,
+            string merchantReference
+            )
         {
             return new List<KeyValuePair<string, string>>
             {
@@ -311,6 +316,7 @@ namespace GownApi.Endpoints
                 new("pstn_rc", "t"),
                 new("pstn_rt", paymentTxnId),
                 new("pstn_tm", "t"),
+                new("pstn_mr", merchantReference),
                 new("pstn_rf", "JSON")
             };
         }

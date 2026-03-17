@@ -1,6 +1,7 @@
 ﻿using DocumentFormat.OpenXml.Drawing.Charts;
 using GownApi.Model;
 using GownApi.Services;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Globalization;
@@ -17,12 +18,13 @@ namespace GownApi.Endpoints
 {
     public static class PaymentEndpoints
     {
-        record PaymentRequest(int PayAmount, string OrderNo);
+        record PaymentRequest(int PayAmount, int OrderId);
 
         public static void MapPaymentEndpoints(this WebApplication app)
         {
             app.MapPost("/api/payment/create-payment", async (
                 PaymentRequest request,
+                GownDb db,
                 IHttpClientFactory httpClientFactory,
                 IQueueJobPublisher publisher,
                 IOptions<PaystationOptions> paystationOptions,
@@ -31,10 +33,10 @@ namespace GownApi.Endpoints
                 CancellationToken ct
                 ) =>
             {
-                if (request.PayAmount <= 0 || string.IsNullOrWhiteSpace(request.OrderNo))
+                if (request.PayAmount <= 0 || request.OrderId <= 0)
                 {
-                    logger.LogWarning("Invalid create-payment request:Amount={PayAmount}, OrderNo={OrderNumber}",
-                        request.PayAmount, request.OrderNo);
+                    logger.LogWarning("Invalid create-payment request: Amount={PayAmount}, OrderId={OrderId}",
+                        request.PayAmount, request.OrderId);
                     return Results.BadRequest("Invalid payment request");
                 }
 
@@ -50,13 +52,34 @@ namespace GownApi.Endpoints
                     return Results.Problem("Paystation config missing.", statusCode: 500);
                 }
 
-                var orderNo = request.OrderNo.Trim();
-                var merchantSession = orderNo;
-                var merchantReference = orderNo;
-                httpContext.Items["OrderNo"] = orderNo;
+                var orderId = request.OrderId;
+                var merchantReference = $"REF{orderId}";
+                var merchantSession = $"REF{orderId}-{Guid.NewGuid():N}";
+                httpContext.Items["MerchantReference"] = merchantReference;
 
-                using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo))
-                using (Serilog.Context.LogContext.PushProperty("MerchantSession", merchantSession))
+                var order = await db.orders.FirstOrDefaultAsync(o => o.Id == request.OrderId, ct);
+                if (order == null)
+                {
+                    logger.LogWarning("Create-payment failed: order not found. OrderId={OrderId}", request.OrderId);
+                    return Results.NotFound("Order not found.");
+                }
+
+                if (order.Paid == true)
+                {
+                    logger.LogWarning("Create-payment failed: order already paid. OrderId={OrderId}", request.OrderId);
+                    return Results.BadRequest("Order is already paid.");
+                }
+
+                var expectedAmountCents = (int)Math.Round(order.OrderAmount * 100m, MidpointRounding.AwayFromZero);
+
+                if (request.PayAmount != expectedAmountCents)
+                {
+                    logger.LogWarning("Create-payment failed: amount mismatch. OrderId={OrderId}, RequestAmount={RequestAmount}, ExpectedAmount={ExpectedAmount}",
+                        request.OrderId, request.PayAmount, expectedAmountCents);
+                    return Results.BadRequest("Payment amount mismatch.");
+                }
+
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantReference))
                 {
                     logger.LogInformation("Paystation init start. PaystationId={PaystationId}, GatewayId={GatewayId}",
                         paystationId, gatewayId);
@@ -97,7 +120,7 @@ namespace GownApi.Endpoints
                                 await publisher.EnqueueEmailJobAsync(new EmailJob(
                                 Type: "PaymentAlertInitFailed",
                                 OrderId: null,
-                                ReferenceNo: orderNo,
+                                ReferenceNo: merchantReference,
                                 TxnId: $"http:{(int)response.StatusCode}",
                                 OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
                                 EmailQueueItemId: null
@@ -114,7 +137,7 @@ namespace GownApi.Endpoints
 
                         logger.LogInformation("Paystation init success. StatusCode={StatusCode}, RedirectUrl={RedirectUrl}, BodySnippet={BodySnippet}",
                               (int)response.StatusCode,
-                              string.IsNullOrWhiteSpace(redirectUrl),
+                              redirectUrl,
                               SafeSnippet(responseString, 6000));
 
                         return Results.Ok(new { redirectUrl });
@@ -122,7 +145,8 @@ namespace GownApi.Endpoints
                     catch (OperationCanceledException) when (ct.IsCancellationRequested)
                     {
 
-                        logger.LogInformation("Create-payment canceled by client. OrderNo={OrderNo}", orderNo);
+                        logger.LogInformation("Create-payment canceled by client. OrderId={OrderId}, MerchantReference={MerchantReference}",
+                            orderId, merchantReference);
                         return Results.Problem("Request canceled.", statusCode: 499);
                     }
                     catch (OperationCanceledException ex)
@@ -134,7 +158,7 @@ namespace GownApi.Endpoints
                             await publisher.EnqueueEmailJobAsync(new EmailJob(
                                 Type: "PaymentAlertInitTimeout",
                                 OrderId: null,
-                                ReferenceNo: orderNo,
+                                ReferenceNo: merchantReference,
                                 TxnId: "upstream-timeout",
                                 OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
                                 EmailQueueItemId: null
@@ -157,7 +181,7 @@ namespace GownApi.Endpoints
                             await publisher.EnqueueEmailJobAsync(new EmailJob(
                                 Type: "PaymentAlertInitException",
                                 OrderId: null,
-                                ReferenceNo: orderNo,
+                                ReferenceNo: merchantReference,
                                 TxnId: ex.GetType().Name,
                                 OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
                                 EmailQueueItemId: null
@@ -178,6 +202,7 @@ namespace GownApi.Endpoints
                 IConfiguration config,
                 GownDb db,
                 IQueueJobPublisher publisher,
+                HttpContext httpContext,
                 ILogger<Program> logger) =>
             {
                 req.EnableBuffering();
@@ -222,15 +247,14 @@ namespace GownApi.Endpoints
 
                 var merchantSession = Get("MerchantSession")?.Trim();
                 var merchantReference = Get("MerchantReference")?.Trim();
-                var orderNo = merchantSession;
                 var requestTime = Get("TransactionTime") ?? Get("PaymentRequestTime");
                 var receiptTime = Get("DigitalOrderTime") ?? Get("DigitalReceiptTime");
                 var purchaseAmountCents = int.TryParse(Get("PurchaseAmount"), out var cents) ? cents : 0;
                 var purchaseAmount = purchaseAmountCents / 100m;
                 var receiptNumber = Get("ReturnReceiptNumber");
+                httpContext.Items["MerchantReference"] = merchantReference;
 
-                using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo ?? ""))
-                using (Serilog.Context.LogContext.PushProperty("MerchantSession", merchantSession ?? ""))
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantReference ?? ""))
                 using (Serilog.Context.LogContext.PushProperty("PaystationTxnId", txnId ?? ""))
                 using (Serilog.Context.LogContext.PushProperty("PaystationEC", ec))
                 using (Serilog.Context.LogContext.PushProperty("AmountCents", purchaseAmountCents))
@@ -239,18 +263,25 @@ namespace GownApi.Endpoints
                     logger.LogInformation("Paystation notify received. ec={EC}, em={EM}, requestTime={RequestTime}, receiptTime={ReceiptTime},amountcents={Amount}, receipt={Receipt}",
                         ec, em, requestTime, receiptTime, purchaseAmountCents, receiptNumber);
 
-                    if (string.IsNullOrWhiteSpace(merchantSession))
+                    if (string.IsNullOrWhiteSpace(merchantReference))
                     {
-                        logger.LogWarning("Paystation notify missing MerchantSession. BodySnippet={BodySnippet}", SafeSnippet(raw, 600));
-                        logger.LogInformation("Paystation notify response: {Resp}", "NO_MERCHANT_SESSION");
-                        return Results.Ok("NO_MERCHANT_SESSION");
+                        logger.LogWarning("Paystation notify missing MerchantReference. BodySnippet={BodySnippet}", SafeSnippet(raw, 600));
+                        logger.LogInformation("Paystation notify response: {Resp}", "NO_MERCHANT_REFERENCE");
+                        return Results.Ok("NO_MERCHANT_REFERENCE");
+                    }
+
+                    if (!TryParseOrderIdFromMerchantReference(merchantReference, out var orderId))
+                    {
+                        logger.LogWarning("Invalid MerchantReference format: {MerchantReference}", merchantReference);
+                        logger.LogInformation("Paystation notify response: {Resp}", "INVALID_MERCHANT_REFERENCE");
+                        return Results.Ok("INVALID_MERCHANT_REFERENCE");
                     }
 
                     Orders? order;
                     try
                     {
                         order = await db.orders
-                            .FirstOrDefaultAsync(o => o.Id == Convert.ToInt32(merchantReference));
+                            .FirstOrDefaultAsync(o => o.Id == orderId);
                     }
                     catch (Exception ex)
                     {
@@ -266,18 +297,41 @@ namespace GownApi.Endpoints
                         return Results.Ok("NO_ORDER_BY_REFERENCE");
                     }
 
+                   
                     order.PaymentEc = ec;
                     order.PaymentEm = em;
+                    var wasPaid = order.Paid == true;
+                    string odertype; 
 
-                    using (Serilog.Context.LogContext.PushProperty("OrderId", order.Id))
-                    {
-                        order.Paid = (ec == 0);
+                    order.Paid = (ec == 0);
 
                         if (ec == 0)
                         {
                             order.AmountPaid = purchaseAmount;
                             //Original Paystation payment transaction id for future refunds
                             order.PaymentTxnId = txnId;
+
+                            if (!string.IsNullOrWhiteSpace(receiptTime) &&
+                                DateTime.TryParseExact(
+                                    receiptTime,
+                                    "yyyy-MM-dd HH:mm:ss",
+                                    CultureInfo.InvariantCulture,
+                                    DateTimeStyles.None,
+                                    out var receiptDt))
+                            {
+                                order.OrderDate = DateOnly.FromDateTime(receiptDt);
+
+                                logger.LogInformation(
+                                    "Parsed receiptTime successfully. ReceiptTime={ReceiptTime}, OrderDate={OrderDate}",
+                                    receiptTime,
+                                    order.OrderDate);
+                            }
+                            else
+                            {
+                                logger.LogWarning(
+                                    "Failed to parse receiptTime from Paystation. ReceiptTime={ReceiptTime}",
+                                    receiptTime);
+                            }
                         }
                         else
                         {
@@ -289,8 +343,8 @@ namespace GownApi.Endpoints
                             await db.SaveChangesAsync();
 
                             // confirm saved
-                            logger.LogInformation("Order payment saved. OrderId={OrderId}, Paid={Paid}, AmountPaidCents={AmountPaid}, PaymentTxnId={PaymentTxnId}",
-                                order.Id, order.Paid, order.AmountPaid, order.PaymentTxnId);
+                            logger.LogInformation("Order payment saved. Paid={Paid}, AmountPaidCents={AmountPaid}, PaymentTxnId={PaymentTxnId}",
+                                order.Paid, order.AmountPaid, order.PaymentTxnId);
                         }
                         catch (Exception ex)
                         {
@@ -306,30 +360,48 @@ namespace GownApi.Endpoints
                             return Results.Ok("PAYMENT_FAILED_UPDATED");
                         }
 
-                        try
+                        if (wasPaid)
+                        {
+                            logger.LogInformation("Duplicate successful notify ignored for email enqueue. OrderId={OrderId}", order.Id);
+                            logger.LogInformation("Paystation notify response: {Resp}", "OK_ALREADY_PAID");
+                            return Results.Ok("OK_ALREADY_PAID");
+                        }
+
+                        if (order.OrderType == "1")
+                        {
+                        odertype = "HirePaymentCompleted";
+                    }else if (order.OrderType == "2")
+                        {
+                            odertype = "BuyPaymentCompleted";
+                        }else
+                        {
+                        odertype = "CasualHirePaymentCompleted";
+                    }
+
+                    try
                         {
                             await publisher.EnqueueEmailJobAsync(new EmailJob(
-                                Type: "PaymentCompleted",
+                                Type: odertype,
                                 OrderId: order.Id,
-                                ReferenceNo: order.ReferenceNo ?? merchantSession ?? order.Id.ToString(),
+                                ReferenceNo: order.ReferenceNo,
                                 TxnId: txnId,
                                 OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
                                 EmailQueueItemId: null
                             ));
 
-                            logger.LogInformation("PaymentCompleted job enqueued. OrderId={OrderId}, Ref={Ref}, TxnId={TxnId}",
-                                order.Id, order.ReferenceNo, txnId);
+                            logger.LogInformation("{HireOrBuyPaymentCompleted} job enqueued.Ref={Ref}, TxnId={TxnId}", odertype,
+                               order.ReferenceNo, txnId);
 
                             logger.LogInformation("Paystation notify response: {Resp}", "OK_ENQUEUED");
                             return Results.Ok("OK");
                         }
                         catch (Exception ex)
                         {
-                            logger.LogError(ex, "Failed to enqueue PaymentCompleted job. OrderId={OrderId}", order.Id);
+                            logger.LogError(ex, "Failed to enqueue HirePaymentCompleted job. OrderId={OrderId}", order.Id);
                             logger.LogInformation("Paystation notify response: {Resp}", "OK_DB_SAVED_EMAIL_ENQUEUE_FAILED");
                             return Results.Ok("OK_DB_SAVED_EMAIL_ENQUEUE_FAILED");
                         }
-                    }
+                    
                 }
             });
         }
@@ -341,6 +413,19 @@ namespace GownApi.Endpoints
             return s >= 0 && e > s
                 ? xml.Substring(s + 14, e - s - 14)
                 : "";
+        }
+
+        private static bool TryParseOrderIdFromMerchantReference(string? merchantReference, out int orderId)
+        {
+            orderId = 0;
+
+            if (string.IsNullOrWhiteSpace(merchantReference))
+                return false;
+
+            if (!merchantReference.StartsWith("REF", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return int.TryParse(merchantReference[3..], out orderId);
         }
 
         private static string SafeSnippet(string? text, int maxLen)

@@ -1,5 +1,6 @@
 ﻿using Azure.Storage;
 using Azure.Storage.Blobs;
+using DocumentFormat.OpenXml.Drawing.Charts;
 using DocumentFormat.OpenXml.InkML;
 using GownApi;
 using GownApi.Endpoints;
@@ -177,17 +178,14 @@ var app = builder.Build();
 
 app.UseExceptionHandler("/error");
 
-// OrderNo & Correlation ID middleware 
+// MerchantReference & Correlation ID middleware 
 app.Use(async (context, next) =>
 {
-    var orderNo = context.Request.Headers["OrderNo"].FirstOrDefault()?? "NotCreatedYet";
     var correlationId = context.TraceIdentifier;
 
-    context.Items["OrderNo"] = orderNo;
     context.Response.Headers["CorrelationID"] = correlationId;
 
     using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
-    using (Serilog.Context.LogContext.PushProperty("OrderNo", orderNo )) 
     {
         await next();
     }
@@ -213,7 +211,7 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("CorrelationId", httpContext.Response.Headers["CorrelationID"].ToString());
         diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
         diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
-        diagnosticContext.Set("OrderNo", httpContext.Items["OrderNo"]?.ToString() ?? "NotCreatedYet");
+        diagnosticContext.Set("MerchantReference", httpContext.Items["MerchantReference"]?.ToString() ?? "NotCreatedYet");
     };
 });
 
@@ -237,26 +235,26 @@ app.Map("/error", (HttpContext httpContext, ILogger<Program> logger) =>
 
     var originalPath = exceptionFeature?.Path ?? httpContext.Request.Path.ToString();
 
-    var orderNo = httpContext.Items["OrderNo"]?.ToString() ?? "NotCreatedYet";
+    var MerchantReference = httpContext.Items["MerchantReference"]?.ToString() ?? "NotCreatedYet";
 
     if (ex is not null)
     {
         logger.LogError(
             ex,
-            "Unhandled exception. Path={Path}, Method={Method}, TraceId={TraceId}, orderNo={orderNo}",
+            "Unhandled exception. Path={Path}, Method={Method}, TraceId={TraceId}, MerchantReference={MerchantReference}",
             originalPath,
             httpContext.Request.Method,
             traceId,
-            orderNo);
+            MerchantReference);
     }
     else
     {
         logger.LogError(
-            "Unhandled exception reached /error, but no exception details were available. Path={Path}, Method={Method}, TraceId={TraceId},orderNo={orderNo} ",
+            "Unhandled exception reached /error, but no exception details were available. Path={Path}, Method={Method}, TraceId={TraceId},MerchantReference={MerchantReference} ",
             originalPath,
             httpContext.Request.Method,
             traceId,
-            orderNo);
+            MerchantReference);
     }
 
     return Results.Problem(

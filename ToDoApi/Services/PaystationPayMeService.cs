@@ -1,9 +1,10 @@
-﻿using GownApi.Model;
-using System.Xml.Linq;
+﻿using DocumentFormat.OpenXml.Drawing.Charts;
+using GownApi.Model;
 using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml.Linq;
 
 namespace GownApi.Services
 {
@@ -12,22 +13,26 @@ namespace GownApi.Services
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<PaystationPayMeService> _logger;
+        
 
-        public PaystationPayMeService(IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<PaystationPayMeService> logger)
+        public PaystationPayMeService(
+            IConfiguration config,
+            IHttpClientFactory httpClientFactory,
+            ILogger<PaystationPayMeService> logger
+            )
         {
             _config = config;
             _httpClientFactory = httpClientFactory;
             _logger = logger;
+            
         }
 
         public async Task<string> CreatePayMeUrlAsync(Orders order, CancellationToken ct = default)
         {
-            
             var paystationId = _config["Paystation:PaystationId"];
             var gatewayId = _config["Paystation:GatewayId"];
             var paymeUrl = _config["Paystation:paymeUrl"];
             var hmacKey = _config["Paystation:HmacKey"];
-
 
             if (string.IsNullOrWhiteSpace(paystationId))
                 throw new InvalidOperationException("Paystation:PaystationId is not configured.");
@@ -43,11 +48,9 @@ namespace GownApi.Services
 
             var client = _httpClientFactory.CreateClient();
 
-            var orderName = $"{order.FirstName} {order.LastName} Ref-{order.Id}".Trim();
-
-            //var amountInCents = Convert.ToInt32(order.OrderAmount);
-
+            var orderName = $"{order.FirstName} {order.LastName} REF{order.Id}".Trim();
             var amountInCents = Convert.ToInt32(Math.Round(order.OrderAmount * 100m, MidpointRounding.AwayFromZero));
+            var merchantReference = $"REF{order.Id.ToString()}";
 
             using var request = new HttpRequestMessage(HttpMethod.Post, paymeUrl)
             {
@@ -58,11 +61,10 @@ namespace GownApi.Services
                     ["pstn_pi"] = paystationId,
                     ["pstn_gi"] = gatewayId,
                     ["pstn_co"] = "T",
-                    //["pstn_am"] = order.OrderAmount.ToString(),
                     ["pstn_am"] = amountInCents.ToString(CultureInfo.InvariantCulture),
                     ["pstn_cu"] = "NZD",
                     ["pstn_tm"] = "T",
-                    ["pstn_mr"] = order.Id.ToString(),
+                    ["pstn_mr"] = merchantReference,
                     ["pstn_mo"] = orderName,
                     ["pstn_af"] = "cents",
                     ["pstn_tc"] = "T"
@@ -73,7 +75,6 @@ namespace GownApi.Services
 
             var unixTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
             var stringToHash = unixTs + "paystation" + bodyString;
-
             var hmacHex = HmacSha512Hex(hmacKey, stringToHash);
 
             var requestUrl =
@@ -83,13 +84,15 @@ namespace GownApi.Services
 
             request.RequestUri = new Uri(requestUrl);
 
-            _logger.LogInformation("PayMe request body: {Body}", bodyString);
-            _logger.LogInformation(
-                "PayMe request amount: {OrderAmountDollars} dollars, {AmountInCents} cents, OrderId: {OrderId}",
-                order.OrderAmount,
-                amountInCents,
-                order.Id
+            
+                _logger.LogInformation("PayMe request body: {Body}", bodyString);
+                _logger.LogInformation(
+                    "PayMe request amount: {OrderAmountDollars} dollars, {AmountInCents} cents, OrderId: {OrderId}",
+                    order.OrderAmount,
+                    amountInCents,
+                    order.Id
                 );
+            
 
             using var response = await client.SendAsync(request, ct);
             var responseBody = await response.Content.ReadAsStringAsync(ct);
