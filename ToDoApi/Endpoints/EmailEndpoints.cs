@@ -1,6 +1,7 @@
 ﻿using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Net;
@@ -19,11 +20,14 @@ namespace GownApi.Endpoints
                 HttpRequest req,
                 IConfiguration config,
                 GownDb db,
+                HttpContext httpContext,
                 ILogger<Program> logger) =>
             {
                 var expectedKey = config["InternalEmail:Key"];
                 var providedKey = req.Headers["X-Internal-Key"].ToString();
                 var emailType = req.Headers["X-Email-Type"].ToString();
+                var merchantReference = $"REF{orderId}";
+                httpContext.Items["MerchantReference"] = merchantReference;
 
                 if (string.IsNullOrWhiteSpace(expectedKey) || providedKey != expectedKey)
                 {
@@ -73,6 +77,7 @@ namespace GownApi.Endpoints
                 string? orderNo,
                 string? email,
                 GownDb db,
+                HttpContext httpContext,
                 ILogger<Program> logger) =>
             {
                 if (string.IsNullOrWhiteSpace(orderNo) || string.IsNullOrWhiteSpace(email))
@@ -81,6 +86,8 @@ namespace GownApi.Endpoints
                 }
 
                 const string templateName = "PurchaseOrderCompleted";
+                var merchantReference = $"REF{orderId}";
+                httpContext.Items["MerchantReference"] = merchantReference;
 
                 try
                 {
@@ -134,6 +141,7 @@ namespace GownApi.Endpoints
                 HttpRequest req,
                 IConfiguration config,
                 GownDb db,
+                HttpContext httpContext,
                 ILogger<Program> logger) =>
             {
                 var expectedKey = config["InternalEmail:Key"];
@@ -146,20 +154,54 @@ namespace GownApi.Endpoints
                     return Results.Unauthorized();
                 }
 
-                var emailQueueItem = await db.EmailQueueItems.FirstOrDefaultAsync(x => x.Id == request.EmailQueueItemId && x.Status == EmailStatus.Pending);
+                var emailQueueItem = await db.EmailQueueItems
+                    .FirstOrDefaultAsync(x => x.Id == request.EmailQueueItemId &&
+                    (x.Status == EmailStatus.Pending || x.Status == EmailStatus.Failed));
 
                 if (emailQueueItem == null)
                 {
-                    logger.LogWarning("EmailQueueItem not found. EmailQueueItemId={EmailQueueItemId}",request.EmailQueueItemId);
-                    return Results.NotFound("Email queue item not found.");
+                    logger.LogWarning("EmailQueueItem not found or not retryable. EmailQueueItemId={EmailQueueItemId}",
+                        request.EmailQueueItemId);
+                    return Results.NotFound("Email queue item not found or not retryable.");
                 }
+
+                var maxAttempts = 5;
+                var currentAttempts = emailQueueItem.AttemptCount;
+
+                if (currentAttempts >= maxAttempts)
+                {
+                    logger.LogWarning(
+                        "EmailQueueItem reached max attempts. EmailQueueItemId={EmailQueueItemId}, OrderId={OrderId}, AttemptCount={AttemptCount}",
+                        emailQueueItem.Id,
+                        emailQueueItem.OrderId,
+                        currentAttempts);
+
+                    return Results.Conflict("Email queue item reached max attempts.");
+                }
+
+
+                var merchantReference = $"REF{emailQueueItem.OrderId}";
+                httpContext.Items["MerchantReference"] = merchantReference;
 
                 emailQueueItem.Status = EmailStatus.Processing;
                 emailQueueItem.ProcessingStartedAt = DateTime.UtcNow;
+                emailQueueItem.AttemptCount = currentAttempts + 1;
 
                 await db.SaveChangesAsync();
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantReference))
+                { 
+                    logger.LogInformation(
+                    "Email queue item marked as processing. EmailQueueItemId={EmailQueueItemId}, OrderId={OrderId}, AttemptCount={AttemptCount}",
+                    emailQueueItem.Id,
+                    emailQueueItem.OrderId,
+                    emailQueueItem.AttemptCount);
+                }
 
-                return Results.Ok(new { emailQueueItem.Id });
+                return Results.Ok(new
+                {
+                    emailQueueItem.Id,
+                    emailQueueItem.AttemptCount
+                });
             });
 
             app.MapPost("/api/email/queue/mark-sent", async (
@@ -167,6 +209,7 @@ namespace GownApi.Endpoints
                 HttpRequest req,
                 IConfiguration config,
                 GownDb db,
+                HttpContext httpContext,
                 ILogger<Program> logger) =>
             {
                 var expectedKey = config["InternalEmail:Key"];
@@ -181,6 +224,7 @@ namespace GownApi.Endpoints
 
                 var emailQueueItem = await db.EmailQueueItems
                     .FirstOrDefaultAsync(x => x.Id == request.EmailQueueItemId);
+                
 
                 if (emailQueueItem == null)
                 {
@@ -188,6 +232,9 @@ namespace GownApi.Endpoints
                         request.EmailQueueItemId);
                     return Results.NotFound("Email queue item not found.");
                 }
+
+                var merchantReference = $"REF{emailQueueItem.OrderId}";
+                httpContext.Items["MerchantReference"] = merchantReference;
 
                 emailQueueItem.ToEmail = request.ToEmail;
                 emailQueueItem.Subject = request.Subject;
@@ -206,6 +253,7 @@ namespace GownApi.Endpoints
                 HttpRequest req,
                 IConfiguration config,
                 GownDb db,
+                HttpContext httpContext,
                 ILogger<Program> logger) =>
             {
                 var expectedKey = config["InternalEmail:Key"];
@@ -220,12 +268,24 @@ namespace GownApi.Endpoints
 
                 var emailQueueItem = await db.EmailQueueItems
                     .FirstOrDefaultAsync(x => x.Id == request.EmailQueueItemId);
+                
 
                 if (emailQueueItem == null)
                 {
                     logger.LogWarning("EmailQueueItem not found. EmailQueueItemId={EmailQueueItemId}",
                         request.EmailQueueItemId);
                     return Results.NotFound("Email queue item not found.");
+                }
+
+                var merchantReference = $"REF{emailQueueItem.OrderId}";
+                httpContext.Items["MerchantReference"] = merchantReference;
+
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantReference))
+                {
+                    logger.LogError("Email send failed. EmailQueueItemId={EmailQueueItemId}, OrderId={OrderId}, LastError={LastError}",
+                        request.EmailQueueItemId,
+                        emailQueueItem.OrderId,
+                        request.LastError);
                 }
 
                 emailQueueItem.Status = EmailStatus.Failed;
@@ -388,8 +448,10 @@ namespace GownApi.Endpoints
             var subject = ApplyTemplate(template.SubjectTemplate, values);
             var bodyTop = ApplyTemplate(template.BodyHtml, values);
             var receiptHtml = ApplyTemplate(template.TaxReceiptHtml, values);
-
-            receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
+            if(order.OrderType == "1") 
+            {
+                receiptHtml = InjectCollectionTimeIntoCollectionRow(receiptHtml, collectionTime);
+            }
             receiptHtml = InjectCartRowsIntoCartTable(receiptHtml, sbRows.ToString());
 
             var receiptInner = ExtractBodyInnerHtml(receiptHtml);

@@ -107,7 +107,7 @@ namespace GownApi.Services
                 ReferenceNo = order.ReferenceNo,
                 RefundedAmount = order.RefundedAmount,
                 RefundTxnId = order.RefundTxnId,
-                RefundedAt = order.RefundedAt,
+                RefundedAt = order.RefundInitiatedAt,
                 RefundEmailSentAt = order.RefundEmailSentAt,
                 PaymentTxnId = order.PaymentTxnId,
                 RefundLastEc = order.RefundLastEc,

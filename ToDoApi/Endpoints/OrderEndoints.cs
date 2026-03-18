@@ -1,4 +1,5 @@
 ﻿using DocumentFormat.OpenXml.Bibliography;
+using DocumentFormat.OpenXml.Drawing.Charts;
 using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
@@ -21,7 +22,7 @@ namespace GownApi.Endpoints
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
                                       o.amount_owning, o.donation, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
-                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refunded_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at
                                       FROM orders o
                                       LEFT JOIN ceremonies c
                                       ON o.ceremony_id = c.id
@@ -34,7 +35,7 @@ namespace GownApi.Endpoints
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
                                       o.amount_owning, o.donation, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
-                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refunded_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at
                                       FROM orders o
                                       LEFT JOIN ceremonies c
                                       ON o.ceremony_id = c.id
@@ -72,17 +73,20 @@ namespace GownApi.Endpoints
                 return Results.Ok(list);
             });
 
-            app.MapGet("/orders/{id}", async (int id, GownDb db, ILogger<Program> logger) =>
+            app.MapGet("/orders/{id}", async (int id, GownDb db, ILogger<Program> logger,HttpContext httpContext) =>
             {
                 var order = await db.orders.FindAsync(id);
 
-                logger.LogInformation("GET /orders/id called with ID={id}", id);
                 if (order is null)
                 {
                     logger.LogInformation("order is null");
 
                     return Results.NotFound();
                 }
+                var merchantReference = $"REF{id}";
+                httpContext.Items["MerchantReference"] = merchantReference;
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantReference))
+                    logger.LogInformation("GET /orders/id called with ID={id}", id);
                 var results = await OrderMapper.ToDtoOut(order, db);
                 return Results.Ok(results);
             });
@@ -93,8 +97,51 @@ namespace GownApi.Endpoints
                 order.CreatedAt = DateTime.UtcNow;
 
                 db.orders.Add(order);
-                    await db.SaveChangesAsync();
-              
+                await db.SaveChangesAsync();
+
+                var merchantReference = $"REF{order.Id}";
+                httpContext.Items["MerchantReference"] = merchantReference;
+
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantReference))
+                {
+                    foreach (var item in orderDto.Items)
+                {
+                    var itemNew = await db.items.FindAsync(item.ItemId);
+                    var skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId);
+
+                    logger.LogInformation("Looking for SKU with itemId: {0}, SizeId: {1}, FitId: {2}, HoodId: {3}",
+                        item.ItemId, item.SizeId, item.FitId, item.HoodId);
+
+                    if (!skuId.Any())
+                    {
+                        skuId.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId, Count = 0 });
+                        db.Sku.Add(skuId[0]);
+                        await db.SaveChangesAsync();
+                        logger.LogInformation("Created new SKU with iD: {0}, itemId: {1}, SizeId: {2}, FitId: {3}, HoodId: {4}, Count: 0",
+                            skuId[0].Id, skuId[0].ItemId, skuId[0].SizeId, skuId[0].FitId, skuId[0].HoodId);
+                    }
+                    else
+                    {
+                        logger.LogInformation("Found Sku Id: {0}", skuId[0].Id);
+                    }
+
+                    logger.LogInformation("Creating orderted items with order id: {0}, skuid: {1}, quantity: {2}, hire: {3}, cost: {4}",
+                        order.Id, skuId[0].Id, item.Quantity, item.Hire, item.Hire ? itemNew.HirePrice : itemNew.BuyPrice);
+
+                    var orderedItems = new OrderedItems
+                    {
+                        OrderId = order.Id,
+                        SkuId = skuId[0].Id,
+                        Quantity = item.Quantity,
+                        Hire = item.Hire,
+                        Cost = (decimal)(item.Hire ? itemNew.HirePrice : itemNew.BuyPrice)
+                    };
+                    db.orderedItems.Add(orderedItems);
+                }
+
+                var result = await db.SaveChangesAsync();
+                logger.LogInformation("POST /orders called, result: {id}", result);
+
                 var updatedOrder = await db.orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == order.Id);
                 if (updatedOrder == null)
                 {
@@ -103,67 +150,21 @@ namespace GownApi.Endpoints
                 }
 
                 var orderNo = updatedOrder.ReferenceNo;
+                var orderId = updatedOrder.Id;
                 var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
-
-                httpContext.Items["OrderNo"] = orderNo;
-
-                using (LogContext.PushProperty("OrderNo", orderNo))
-                using (logger.BeginScope(new Dictionary<string, object?>
-                {
-                    ["OrderNo"] = orderNo
-                }))
-                {
-                    foreach (var item in orderDto.Items)
-                    {
-                        var itemNew = await db.items.FindAsync(item.ItemId);
-                        var skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId);
-
-                        logger.LogInformation("Looking for SKU with itemId: {0}, SizeId: {1}, FitId: {2}, HoodId: {3}",
-                            item.ItemId, item.SizeId, item.FitId, item.HoodId);
-
-                        if (!skuId.Any())
-                        {
-                            skuId.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId, Count = 0 });
-                            db.Sku.Add(skuId[0]);
-                            await db.SaveChangesAsync();
-                            logger.LogInformation("Created new SKU with iD: {0}, itemId: {1}, SizeId: {2}, FitId: {3}, HoodId: {4}, Count: 0",
-                                skuId[0].Id, skuId[0].ItemId, skuId[0].SizeId, skuId[0].FitId, skuId[0].HoodId);
-                        }
-                        else
-                        {
-                            logger.LogInformation("Found Sku Id: {0}", skuId[0].Id);
-                        }
-
-                        logger.LogInformation("Creating orderted items with order id: {0}, skuid: {1}, quantity: {2}, hire: {3}, cost: {4}",
-                            order.Id, skuId[0].Id, item.Quantity, item.Hire, item.Hire ? itemNew.HirePrice : itemNew.BuyPrice);
-
-                        var orderedItems = new OrderedItems
-                        {
-                            OrderId = order.Id,
-                            SkuId = skuId[0].Id,
-                            Quantity = item.Quantity,
-                            Hire = item.Hire,
-                            Cost = (decimal)(item.Hire ? itemNew.HirePrice : itemNew.BuyPrice)
-                        };
-                        db.orderedItems.Add(orderedItems);
-                    }
-
-                    var result = await db.SaveChangesAsync();
-                    logger.LogInformation("POST /orders called, result: {id}", result);
-
-                    // Enqueue purchase order email here
 
                     if (updatedOrder.PaymentMethod == 3)
                     {
-                        try {
+                        try
+                        {
                             await publisher.EnqueueEmailJobAsync(new EmailJob(
-                              Type: "PurchaseOrderCompleted",
-                              OrderId: updatedOrder.Id,
-                              ReferenceNo: orderNo,
-                              TxnId: updatedOrder.PurchaseOrder,
-                              OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
-                              EmailQueueItemId: null
-                          ));
+                                Type: "PurchaseOrderCompleted",
+                                OrderId: orderId,
+                                ReferenceNo: orderNo,
+                                TxnId: updatedOrder.PurchaseOrder,
+                                OccurredAt: TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, nzTz),
+                                EmailQueueItemId: null
+                            ));
                         }
                         catch (Exception ex)
                         {
@@ -177,6 +178,7 @@ namespace GownApi.Endpoints
                     }
 
                     return Results.Created($"/orders/{updatedOrder.Id}", updatedOrder);
+                
                 }
             });
 

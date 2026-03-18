@@ -11,6 +11,7 @@
         public string PayMePurchaseUrl { get; set; }
         public string OAuthUrl { get; set; }
         public string ResponseUrl { get; set; }
+        public string LookupUrl { get; set; }
         public bool TestMode { get; set; }
         public string? HmacKey { get; set; }
 

@@ -58,7 +58,7 @@ namespace GownApi.Services
                 await _publisher.EnqueueEmailJobAsync(new EmailJob(
                     Type: "PaymentReminder1",
                     OrderId: order.Id,
-                    ReferenceNo: $"Ref-{order.Id}",
+                    ReferenceNo: $"REF{order.Id}",
                     TxnId: paymeUrl,
                     OccurredAt: DateTimeOffset.UtcNow,
                     EmailQueueItemId: null
@@ -87,7 +87,7 @@ namespace GownApi.Services
                 await _publisher.EnqueueEmailJobAsync(new EmailJob(
                     Type: "PaymentReminder2",
                     OrderId: order.Id,
-                    ReferenceNo: $"Ref-{order.Id}",
+                    ReferenceNo: $"REF{order.Id}",
                     TxnId: firstReminderEmail.PayMeUrl,
                     OccurredAt: DateTimeOffset.UtcNow,
                     EmailQueueItemId: null
