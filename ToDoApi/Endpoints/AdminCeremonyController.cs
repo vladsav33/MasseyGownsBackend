@@ -140,7 +140,7 @@ namespace GownApi.Endpoints
                             Location = order.Location,
                             CeremonyName = order.Ceremony_full_name1,
                             StudentId = order.Student_ID.ToString(),
-                            Forename = order.Forename1,
+                            Forename = order.Forename,
                             Surname = order.Surname,
                             FullName = order.Full_Name,
                             ProgramCode = order.Programme_code,
