@@ -10,7 +10,8 @@ namespace GownApi.Services
             int itemId,
             int? sizeId = null,
             int? fitId = null,
-            int? hoodId = null )
+            int? hoodId = null,
+            int? hatId = null)
         {
             var query = db.Sku.AsQueryable();
 
@@ -24,6 +25,9 @@ namespace GownApi.Services
 
             if (hoodId.HasValue && hoodId != 0)
                 query = query.Where(x => x.HoodId == hoodId);
+
+            if (hatId.HasValue && hatId != 0)
+                query = query.Where(x => x.HatId == hatId);
 
             return await query.ToListAsync();
         }
