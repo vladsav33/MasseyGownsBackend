@@ -37,6 +37,9 @@ namespace GownApi.Services
                 .Select(f => new { f.Id, Value = f.FitType })
                 .ToListAsync();
 
+            var hats = await db.hats
+                .FromSqlRaw("SELECT h.id, h.size, h.labelsize, h.display_order, h.item_id FROM hats h WHERE h.item_id = {0} ORDER BY h.display_order", items.Id).ToListAsync();
+
             var sql = "SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE NOT h.doctoral AND i.id = {0}";
 
             if (items.DegreeId == 6 || items.DegreeId == 7)
@@ -85,8 +88,8 @@ namespace GownApi.Services
                 itemDto.Options = new List<Dictionary<string, object>> {
                                         new () {
                                             ["label"] = "Head Size",
-                                            ["value"] = sizes[0],
-                                            ["choices"] = sizes
+                                            ["value"] = hats[0],
+                                            ["choices"] = hats
                                         }
                                     };
             }

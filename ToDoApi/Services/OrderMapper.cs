@@ -54,7 +54,9 @@ namespace GownApi.Services
                 return null;
 
             var items = await db.selectedItemOut
-                    .FromSqlRaw(@"SELECT oi.id, oi.cost, i.name as item_name, i.id as item_id, size as size_name, s.id as size_id, s.labelsize, d.labeldegree, f.fit_type as fit_name, h.name as hood_name, h.short_name as hood_short, hire, quantity
+                    .FromSqlRaw(@"SELECT oi.id, oi.cost, i.name as item_name, i.id as item_id, s.size as size_name, s.id as size_id,
+                                  s.labelsize, d.labeldegree, f.fit_type as fit_name, h.name as hood_name, h.short_name as hood_short,
+                                  ht.size as hat_size, hire, quantity
                                   FROM ordered_items oi
                                   INNER JOIN sku sk ON sk.id = oi.sku_id
                                   INNER JOIN orders o ON oi.order_id = o.id
@@ -62,6 +64,7 @@ namespace GownApi.Services
                                   INNER JOIN items i ON i.id = sk.item_id
                                   LEFT JOIN sizes s ON s.id = sk.size_id
                                   LEFT JOIN fit f ON f.id = sk.fit_id
+                                  LEFT JOIN hats ht ON ht.id = sk.hat_id  
                                   LEFT JOIN hood_type h ON h.id = sk.hood_id
                                   WHERE oi.order_id = {0}", order.Id)
                     .ToArrayAsync();

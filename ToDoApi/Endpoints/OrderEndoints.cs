@@ -111,10 +111,10 @@ namespace GownApi.Endpoints
                     var itemNew = await db.items.FindAsync(item.ItemId);
 
                     var skuId = new List<Sku>();
-                    if (item.Category == "Set")
-                        skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId, item.HatId);
-                    else
-                        skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId);
+                    //if (item.Category == "Set")
+                    //    skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId, item.HatId);
+                    //else
+                    skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId, item.HatId);
 
 
                         logger.LogInformation("Looking for SKU with itemId: {0}, SizeId: {1}, FitId: {2}, HoodId: {3}, HatId: {4}",
