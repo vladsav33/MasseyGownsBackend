@@ -30,8 +30,8 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Email settings
-var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>();
-if (emailSettings is not null)
+//var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>();
+/*if (emailSettings is not null)
 {
     builder.Services.AddSingleton(emailSettings);
 }
@@ -39,7 +39,7 @@ else
 {
     // still run, but log a warning so it's visible
     Log.Warning("Email settings are missing or invalid in configuration section: Email");
-}
+}*/
 
 // Email service
 
@@ -286,7 +286,6 @@ app.MapPaymentEndpoints();
 app.MapRefundEndpoints();
 app.MapControllers();
 app.MapEmailEndpoints();
-app.MapAdminRefundLookupEndpoints();
 app.MapAdminRefundSyncEndpoints();
 
 

@@ -1,30 +1,89 @@
-﻿using GownApi.Model;
+﻿using GownApi;
+using GownApi.Model;
 using GownApi.Services.Paystation;
 using Microsoft.EntityFrameworkCore;
 
-namespace GownApi.Endpoints
+public static class AdminRefundSyncEndpoints
 {
-    public static class AdminRefundSyncEndpoints
+    private static object BuildRefundDto(Orders order) => new
     {
+        order.RefundStatusCode,
+        order.Refund,
+        order.RefundedAmount,
+        order.RefundInitiatedAt,
+        order.RefundLastEc,
+        order.RefundLastEm
+    };
 
-        public static void MapAdminRefundSyncEndpoints(this WebApplication app)
+    private static object BuildLookupDto(PaystationQuickLookupResult parsed) => new
+    {
+        parsed.LookupCode,
+        parsed.LookupMessage,
+        parsed.TransactionProcess,
+        parsed.TotalSuccessfulRefunds,
+        parsed.PaystationErrorCode,
+        parsed.PaystationErrorMessage
+    };
+
+    private static IResult RefundSyncOk(Orders order, PaystationQuickLookupResult? parsed = null)
+    {
+        if (parsed == null)
         {
-            // POST /api/admin/orders/{orderId}/refund/sync
-            app.MapPost("/api/admin/orders/{orderId:int}/refund/sync", async (
-                int orderId,
-                GownDb db,
-                PaystationQuickLookupClient client,
-                HttpContext httpContext,
-                ILogger<Program> logger) =>
+            return Results.Ok(new
             {
-                var order = await db.orders.FirstOrDefaultAsync(o => o.Id == orderId);
-                if (order == null) return Results.NotFound("Order not found.");
+                refund = BuildRefundDto(order)
+            });
+        }
 
-                var merchantreference = $"RREF{order.Id}";
-                httpContext.Items["MerchantReference"] = merchantreference;
+        return Results.Ok(new
+        {
+            lookup = BuildLookupDto(parsed),
+            refund = BuildRefundDto(order)
+        });
+    }
 
+    public static void MapAdminRefundSyncEndpoints(this WebApplication app)
+    {
+        app.MapPost("/api/admin/orders/{orderId:int}/refund/sync", async (
+            int orderId,
+            GownDb db,
+            PaystationQuickLookupClient client,
+            HttpContext httpContext,
+            ILogger<Program> logger) =>
+        {
+            var order = await db.orders.FirstOrDefaultAsync(o => o.Id == orderId);
+            if (order == null) return Results.NotFound("Order not found.");
+
+            var merchantreference = $"CRREF{order.Id}";
+            httpContext.Items["MerchantReference"] = merchantreference;
+
+            using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantreference))
+            {
                 if (string.IsNullOrWhiteSpace(order.PaymentTxnId))
-                    return Results.BadRequest("Missing payment_txn_id on order; cannot lookup refund status.");
+                {
+                    logger.LogInformation("Order is unpaid. OrderId={OrderId}", orderId);
+                    return Results.BadRequest(new 
+                    {
+                        message = "The order is unpaid.",
+                        refund = BuildRefundDto(order)
+                    });
+                }
+
+                if (order.RefundStatusCode == RefundStatusCode.None)
+                {
+                    logger.LogInformation("No refund record found. OrderId={OrderId}", orderId);
+                    return Results.Ok(new
+                    {
+                        message = "No refund record found.",
+                        refund = BuildRefundDto(order)
+                    });
+                }
+
+                if (order.RefundStatusCode == RefundStatusCode.Requested)
+                {
+                    logger.LogInformation("Refund has not been approved yet. OrderId={OrderId}", orderId);
+                    return RefundSyncOk(order);
+                }
 
                 string xml;
                 PaystationQuickLookupResult parsed;
@@ -32,60 +91,44 @@ namespace GownApi.Endpoints
                 try
                 {
                     xml = await client.LookupRawXmlByTxnIdAsync(order.PaymentTxnId);
-                    logger.LogInformation("Refund sync lookup raw XML. OrderId={OrderId}, PaymentTxnId={PaymentTxnId}, Xml={Xml}",
+
+                    logger.LogInformation(
+                        "Refund sync lookup raw XML. OrderId={OrderId}, PaymentTxnId={PaymentTxnId}, Xml={Xml}",
                         orderId,
                         order.PaymentTxnId,
-                        xml);
+                        xml
+                    );
 
                     parsed = PaystationQuickLookupParser.Parse(xml);
 
-                    logger.LogInformation("Refund sync parsed lookup. OrderId={OrderId}, LookupCode={LookupCode}, LookupMessage={LookupMessage}, TransactionProcess={TransactionProcess}, TotalSuccessfulRefunds={TotalSuccessfulRefunds}, PaystationErrorCode={PaystationErrorCode}, PaystationErrorMessage={PaystationErrorMessage}",
-                        orderId,parsed.LookupCode,parsed.LookupMessage,parsed.TransactionProcess,parsed.TotalSuccessfulRefunds,parsed.PaystationErrorCode,parsed.PaystationErrorMessage);
+                    logger.LogInformation(
+                        "Refund sync parsed lookup. OrderId={OrderId}, LookupCode={LookupCode}, LookupMessage={LookupMessage}, TransactionProcess={TransactionProcess}, TotalSuccessfulRefunds={TotalSuccessfulRefunds}, PaystationErrorCode={PaystationErrorCode}, PaystationErrorMessage={PaystationErrorMessage}",
+                        orderId,
+                        parsed.LookupCode,
+                        parsed.LookupMessage,
+                        parsed.TransactionProcess,
+                        parsed.TotalSuccessfulRefunds,
+                        parsed.PaystationErrorCode,
+                        parsed.PaystationErrorMessage
+                    );
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Refund sync lookup failed. OrderId={OrderId}", orderId);
-                    order.RefundLastEc = -1;
-                    order.RefundLastEm = "Quick lookup call/parse failed.";
-
-                    await db.SaveChangesAsync();
-
                     return Results.Problem("Lookup failed.");
                 }
 
-              
                 if (!string.Equals(parsed.LookupCode, "00", StringComparison.OrdinalIgnoreCase))
                 {
-                    order.RefundLastEc = -2; 
-                    order.RefundLastEm = $"Lookup failed: {parsed.LookupCode} {parsed.LookupMessage}".Trim();
+                    logger.LogWarning(
+                        "Refund sync lookup returned non-success code. OrderId={OrderId}, LookupCode={LookupCode}, LookupMessage={LookupMessage}",
+                        orderId,
+                        parsed.LookupCode,
+                        parsed.LookupMessage
+                    );
 
-                    await db.SaveChangesAsync();
-
-                    return Results.Ok(new
-                    {
-                        orderId = order.Id,
-                        paymentTxnId = order.PaymentTxnId,
-                        lookup = parsed,
-                        lookupSummary = new
-                        {
-                            parsed.LookupCode,
-                            parsed.LookupMessage,
-                            parsed.TransactionProcess,
-                            parsed.TotalSuccessfulRefunds,
-                            parsed.PaystationErrorCode,
-                            parsed.PaystationErrorMessage
-                        },
-                        refund = new
-                        {
-                            order.RefundStatusCode,
-                            order.RefundedAmount,
-                            order.RefundInitiatedAt,
-                            order.RefundLastEc,
-                            order.RefundLastEm
-                        }
-                    });
+                    return RefundSyncOk(order, parsed);
                 }
-
 
                 var totalSuccessfulRefunds = parsed.TotalSuccessfulRefunds ?? 0;
                 var hasSuccessfulRefund = totalSuccessfulRefunds > 0;
@@ -96,49 +139,25 @@ namespace GownApi.Endpoints
                     order.Refunded = true;
                     order.RefundedAmount = Math.Round(totalSuccessfulRefunds / 100m, 2);
 
-                    order.RefundLastEc = 0;
-                    order.RefundLastEm = "Refund completed (synced via quick lookup).";
+                    await db.SaveChangesAsync();
+
+                    logger.LogInformation(
+                        "Refund sync marked order as completed. OrderId={OrderId}, RefundedAmount={RefundedAmount}",
+                        orderId,
+                        order.RefundedAmount
+                    );
                 }
                 else
                 {
-                    if (order.RefundStatusCode == RefundStatusCode.InProgress)
-                    {
-                        order.RefundLastEc = 13;
-                        order.RefundLastEm = "Lookup successful, but no successful refund found yet.";
-                    }
-                    else if (order.RefundStatusCode == RefundStatusCode.None)
-                    {
-                        order.RefundLastEc = 0;
-                        order.RefundLastEm = "Lookup successful. Original purchase transaction is successful, and no refund has been recorded.";
-                    }
+                    logger.LogInformation(
+                        "Refund sync found no successful refund yet. OrderId={OrderId}, CurrentRefundStatusCode={RefundStatusCode}",
+                        orderId,
+                        order.RefundStatusCode
+                    );
                 }
 
-                await db.SaveChangesAsync();
-
-                return Results.Ok(new
-                {
-                    orderId = order.Id,
-                    paymentTxnId = order.PaymentTxnId,
-                    lookup = parsed,
-                    lookupSummary = new
-                    {
-                        parsed.LookupCode,
-                        parsed.LookupMessage,
-                        parsed.TransactionProcess,
-                        parsed.TotalSuccessfulRefunds,
-                        parsed.PaystationErrorCode,
-                        parsed.PaystationErrorMessage
-                    },
-                    refund = new
-                    {
-                        order.RefundStatusCode,
-                        order.RefundedAmount,
-                        order.RefundInitiatedAt,
-                        order.RefundLastEc,
-                        order.RefundLastEm
-                    }
-                });
-            });
-        }
+                return RefundSyncOk(order, parsed);
+            }
+        });
     }
 }
