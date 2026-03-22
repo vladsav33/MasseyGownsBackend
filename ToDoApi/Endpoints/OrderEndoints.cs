@@ -4,7 +4,9 @@ using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Serilog.Context;
+using System.CodeDom;
 
 namespace GownApi.Endpoints
 {
@@ -107,18 +109,26 @@ namespace GownApi.Endpoints
                     foreach (var item in orderDto.Items)
                 {
                     var itemNew = await db.items.FindAsync(item.ItemId);
-                    var skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId);
 
-                    logger.LogInformation("Looking for SKU with itemId: {0}, SizeId: {1}, FitId: {2}, HoodId: {3}",
-                        item.ItemId, item.SizeId, item.FitId, item.HoodId);
+                    var skuId = new List<Sku>();
+                    //if (item.Category == "Set")
+                    //    skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId, item.HatId);
+                    //else
+                    skuId = await SkuService.FindSkusAsync(db, item.ItemId, item.SizeId, item.FitId, item.HoodId, item.HatId);
+
+
+                        logger.LogInformation("Looking for SKU with itemId: {0}, SizeId: {1}, FitId: {2}, HoodId: {3}, HatId: {4}",
+                        item.ItemId, item.SizeId, item.FitId, item.HoodId, item.HatId);
 
                     if (!skuId.Any())
                     {
-                        skuId.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId, HoodId = item.HoodId, Count = 0 });
+                        skuId.Add(new Sku { ItemId = item.ItemId, SizeId = item.SizeId, FitId = item.FitId,
+                            HoodId = item.HoodId, Count = 0, HatId = item.HatId });
                         db.Sku.Add(skuId[0]);
                         await db.SaveChangesAsync();
-                        logger.LogInformation("Created new SKU with iD: {0}, itemId: {1}, SizeId: {2}, FitId: {3}, HoodId: {4}, Count: 0",
-                            skuId[0].Id, skuId[0].ItemId, skuId[0].SizeId, skuId[0].FitId, skuId[0].HoodId);
+                        logger.LogInformation("Created new SKU with iD: {0}, itemId: {1}, SizeId: {2}, FitId: {3}, HatId: {4}" +
+                            " HoodId: {5}, Count: 0",
+                            skuId[0].Id, skuId[0].ItemId, skuId[0].SizeId, skuId[0].FitId, skuId[0].HatId, skuId[0].HoodId);
                     }
                     else
                     {

@@ -37,5 +37,6 @@
         public decimal? hat {get; set; }
         public decimal? xtra_hood {get; set; }
         public decimal? ucol_sash {get; set; }
+        public int? AccountCode { get; set; }
     }
 }
