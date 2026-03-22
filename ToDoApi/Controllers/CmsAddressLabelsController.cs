@@ -29,7 +29,7 @@ namespace GownApi.Controllers
 
             if (type == "individual")
             {
-                var q = _db.orders.AsNoTracking().AsQueryable();
+                var q = _db.orders.AsNoTracking().Where(o=>o.ReferenceNo != null);
 
                 if (dateFrom.HasValue)
                     q = q.Where(o => o.OrderDate >= dateFrom.Value);
@@ -59,7 +59,7 @@ namespace GownApi.Controllers
                     from o in q 
                     join c in _db.ceremonies.AsNoTracking() on o.CeremonyId equals c.Id into cj
                     from c in cj.DefaultIfEmpty()
-                    orderby o.OrderDate descending
+                    orderby o.OrderDate descending, o.ReferenceNo descending
                     select new AddressLabelDto
                     // .OrderByDescending(o => o.OrderDate)//20260201
                     //.Select(o => new AddressLabelDto//20260201
@@ -68,7 +68,7 @@ namespace GownApi.Controllers
                         OrderType = "individual",
                         SourceId = o.Id,
                         OrderDate = o.OrderDate,
-                        OrderNumber = o.Id.ToString(),
+                        OrderNumber = o.ReferenceNo,
                         ToName = (o.FirstName ?? "") + " " + (o.LastName ?? ""),
                         Attn = o.FirstName,
                         Phone = o.Phone,
