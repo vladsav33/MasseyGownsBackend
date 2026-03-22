@@ -56,7 +56,7 @@ namespace GownApi.Endpoints
 
             app.MapGet("/api/admin/internal-forms", async (GownDb db) =>
             {
-                var list = await db.orders
+                var list = await db.orders.Where(o => o.ReferenceNo != null && o.OrderType != "1")
                     .OrderByDescending(o => o.OrderDate)
                     .Select(o => new InternalFormListDto
                     {
@@ -313,7 +313,7 @@ namespace GownApi.Endpoints
 
                         AmountPaid = o.AmountPaid,
                         WebOrderNo = o.ReferenceNo,
-                        ReceiptNo = "2420",
+                        ReceiptNo = o.ReferenceNo.Replace("ORD","").TrimStart('0'),
 
                         Items = new List<InternalFormPrintItemDto>()
                     };
