@@ -32,6 +32,7 @@
         public decimal? AmountPaid { get; set; }
         public decimal? AmountOwning { get; set; }
         public decimal? Donation { get; set; }
+        public int? AccountCode { get; set; }
         public decimal? Freight { get; set; }
         public decimal? Refund { get; set; }
         public decimal? AdminCharges { get; set; }

@@ -102,6 +102,7 @@ namespace GownApi.Services
                 AmountPaid = order.AmountPaid,
                 AmountOwning = order.AmountOwning,
                 Donation = order.Donation,
+                AccountCode = order.AccountCode,
                 Freight = order.Freight,
                 Refund = order.Refund,
                 AdminCharges = order.AdminCharges,

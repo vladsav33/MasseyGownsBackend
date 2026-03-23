@@ -78,7 +78,7 @@ namespace GownApi.Endpoints
                 var sql = @"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.payment_ec, o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
-                                      o.amount_owning, o.donation, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
                                       o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at
                                       FROM orders o
                                       LEFT JOIN ceremonies c
