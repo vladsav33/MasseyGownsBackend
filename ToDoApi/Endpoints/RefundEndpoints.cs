@@ -27,10 +27,10 @@ namespace GownApi.Endpoints
                 if (request.RefundAmount <= 0)
                     return Results.BadRequest("Invalid refund amount.");
 
-                   Orders? order;
+                Orders? order;
                 try {
-                     order = await db.orders.FirstOrDefaultAsync(o => o.Id == orderId);
-                }catch(Exception ex)
+                    order = await db.orders.FirstOrDefaultAsync(o => o.Id == orderId);
+                } catch (Exception ex)
                 {
                     logger.LogError(ex, "Database error while fetching order for refund request. OrderId={OrderId}", orderId);
                     return Results.Problem("Database error while fetching order.");
@@ -40,55 +40,51 @@ namespace GownApi.Endpoints
                 // Refunded / in progress / requested are not allowed to request again
 
                 var merchantreference = $"RREF{order.Id}";
-                httpContext.Items["MerchantReference"] = merchantreference; 
+                httpContext.Items["MerchantReference"] = merchantreference;
 
-                using(Serilog.Context.LogContext.PushProperty("MerchantReference", merchantreference))
+                using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantreference))
                 {
                     logger.LogInformation("Refund request initiated. OrderId={OrderId}, Amount={Amount}, By={By}",
                         order.Id, request.RefundAmount, httpContext.User.Identity?.Name ?? "");
-                
 
-                if (request.RefundAmount > order.AmountPaid)
-                    return Results.BadRequest("Refund amount cannot exceed amount paid.");
 
-                if (order.Paid is not true)
-                    return Results.BadRequest("Only paid orders can be refunded.");
+                    if (request.RefundAmount > order.AmountPaid)
+                        return Results.BadRequest("Refund amount cannot exceed amount paid.");
 
-                if (order.Refunded || order.RefundStatusCode == RefundStatusCode.Completed)
-                    return Results.Conflict("Order already refunded.");
+                    if (order.Paid is not true)
+                        return Results.BadRequest("Only paid orders can be refunded.");
 
-                if (order.RefundStatusCode == RefundStatusCode.InProgress)
-                    return Results.Conflict("Refund already in progress.");
+                    if (order.Refunded || order.RefundStatusCode == RefundStatusCode.Completed)
+                        return Results.Conflict("Order already refunded.");
 
-                if (order.RefundStatusCode == RefundStatusCode.Requested)
-                    return Results.Conflict("Refund already requested.");
+                    if (order.RefundStatusCode == RefundStatusCode.InProgress)
+                        return Results.Conflict("Refund already in progress.");
 
-                // write initial refund request status
-                order.RefundStatusCode = RefundStatusCode.Requested;
-                order.RefundedAmount = request.RefundAmount;
-                order.RefundInitiatedAt = null;
-                order.RefundTxnId = null;
-                order.RefundLastEc = null;
-                order.RefundLastEm = null;
+                    if (order.RefundStatusCode == RefundStatusCode.Requested)
+                        return Results.Conflict("Refund already requested.");
 
-                try{
-                    await db.SaveChangesAsync(); 
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Database error while saving refund request. OrderId={OrderId}", orderId);
-                    return Results.Problem("Database error while saving refund request.");
-                }
+                    // write initial refund request status
+                    order.RefundStatusCode = RefundStatusCode.Requested;
+                    order.Refund = request.RefundAmount;
 
-                logger.LogInformation("Refund requested. OrderId={OrderId}, Amount={Amount}, By={By}",
-                    order.Id, request.RefundAmount, httpContext.User.Identity?.Name ?? "");
+                    try {
+                        await db.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Database error while saving refund request. OrderId={OrderId}", orderId);
+                        return Results.Problem("Database error while saving refund request.");
+                    }
+
+                    logger.LogInformation("Refund requested. OrderId={OrderId}, Amount={Amount}, By={By}",
+                        order.Id, request.RefundAmount, httpContext.User.Identity?.Name ?? "");
                 }
 
                 return Results.Ok(new
                 {
                     orderId = order.Id,
                     refundStatusCode = order.RefundStatusCode,
-                    amount = order.RefundedAmount
+                    amount = order.Refund
                 });
             })
                 .RequireAuthorization();
@@ -97,7 +93,7 @@ namespace GownApi.Endpoints
                 int orderId,
                 RefundRequest request,
                 GownDb db,
-                IOptions < PaystationOptions > paystationOptions,
+                IOptions<PaystationOptions> paystationOptions,
                 IHttpClientFactory httpClientFactory,
                 IQueueJobPublisher publisher,
                 ILogger<Program> logger,
@@ -108,17 +104,17 @@ namespace GownApi.Endpoints
 
                 Orders? order;
                 try {
-                     order = await db.orders.FirstOrDefaultAsync(o => o.Id == orderId);
-                }catch(Exception ex)
+                    order = await db.orders.FirstOrDefaultAsync(o => o.Id == orderId);
+                } catch (Exception ex)
                 {
                     logger.LogError(ex, "Database error while fetching order for refund approval. OrderId={OrderId}", orderId);
                     return Results.Problem("Database error while fetching order.");
-                }   
+                }
                 if (order == null) return Results.NotFound("Order not found.");
 
                 var merchantreference = $"RREF{order.Id}";
                 httpContext.Items["MerchantReference"] = merchantreference;
-
+                
                 if (request.RefundAmount > order.AmountPaid)
                     return Results.BadRequest("Refund amount cannot exceed amount paid.");
 
@@ -131,9 +127,9 @@ namespace GownApi.Endpoints
 
                 // 2) Request -> Approve flow: only allowed if currently in "Requested" state
                 if (order.RefundStatusCode != RefundStatusCode.Requested)
-                    return Results.Conflict($"Refund is not in requested state. Current={order.RefundStatusCode}");
+                    return Results.Conflict($"Refund is not in requested state. Current status: {order.RefundStatusCode}");
 
-                if (request.RefundAmount != order.RefundedAmount)
+                if (request.RefundAmount != order.Refund)
                     return Results.BadRequest("Approved refund amount must match requested amount.");
 
                 // 3) txn id needed for refund API call
@@ -163,7 +159,7 @@ namespace GownApi.Endpoints
                 // Merchant session
                 //var merchantSession = order.ReferenceNo.Trim();
                 //if (string.IsNullOrWhiteSpace(merchantSession)) 
-                  //  return Results.BadRequest("Paid order must have merchantSession.");
+                //  return Results.BadRequest("Paid order must have merchantSession.");
                 //var refundMerchantSession = "Re" + merchantSession;
                 var refundMerchantReference = $"RREF{order.Id}";
                 var refundMerchantSession = $"RREF{order.Id}-{Guid.NewGuid():N}";
@@ -174,7 +170,7 @@ namespace GownApi.Endpoints
                 order.RefundLastEc = null;
                 order.RefundLastEm = null;
                 order.Refunded = false;
-                order.RefundedAmount = request.RefundAmount;
+                order.Refund = request.RefundAmount;
                 order.RefundInitiatedAt = null;
                 order.RefundTxnId = null;
 
@@ -213,56 +209,55 @@ namespace GownApi.Endpoints
 
                 string respText;
                 HttpStatusCode httpStatus;
-
-                try
-                {
-                    var httpResult = await PostRefundToPaystationAsync(httpClientFactory, url, content);
-                    httpStatus = httpResult.StatusCode;
-                    respText = httpResult.ResponseText;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Paystation refund call failed (http). OrderId={OrderId}", order.Id);
-                    order.RefundLastEc = -1;
-                    order.RefundLastEm = "Paystation refund call failed (http).";
-                    order.RefundStatusCode = RefundStatusCode.Failed;
-                    await db.SaveChangesAsync();
-                    return Results.Problem("Paystation refund call failed.");
-                }
-
                 using (Serilog.Context.LogContext.PushProperty("MerchantReference", merchantreference))
                 {
+                    try
+                    {
+                        var httpResult = await PostRefundToPaystationAsync(httpClientFactory, url, content);
+                        logger.LogInformation("Requested content{content}", bodyString);
+
+                        httpStatus = httpResult.StatusCode;
+                        respText = httpResult.ResponseText;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Paystation refund call failed (http). OrderId={OrderId}", order.Id);
+                        order.RefundLastEm = "Refund result uncertain: response not received.";
+                        order.RefundStatusCode = RefundStatusCode.InProgress;
+                        await db.SaveChangesAsync();
+                        return Results.Problem("Refund result uncertain. Please run refund sync.");
+                    }
                     logger.LogInformation("Paystation refund response. HttpStatus={HttpStatus}, BodySnippet={BodySnippet}",
                         (int)httpStatus, SafeSnippet(respText, 3000));
                 }
 
                 if (!((int)httpStatus >= 200 && (int)httpStatus < 300))
                 {
-                    order.RefundLastEc = -2;
                     order.RefundLastEm = $"Paystation HTTP {(int)httpStatus}";
-                    order.RefundStatusCode = RefundStatusCode.Failed;
+                    order.RefundStatusCode = RefundStatusCode.InProgress;
                     await db.SaveChangesAsync();
-                    return Results.Problem($"Paystation returned HTTP {(int)httpStatus}.");
+                    return Results.Problem("Refund result uncertain. Please run refund sync.");
                 }
 
-                var (ec, em, refundTxnId,refundTxnTime) = ParsePaystationResponse(respText);
+                var (ec, em, refundTxnId, refundTxnTime, refundedAmount) = ParsePaystationResponse(respText);
                 var parsedRefundInitiatedAtUtc = ParsePaystationTransactionTimeUtc(refundTxnTime);
 
                 order.RefundLastEc = ec;
                 order.RefundLastEm = em;
-                var occurredAt = parsedRefundInitiatedAtUtc.HasValue? new DateTimeOffset(parsedRefundInitiatedAtUtc.Value): DateTimeOffset.UtcNow;
+                var occurredAt = parsedRefundInitiatedAtUtc.HasValue ? new DateTimeOffset(parsedRefundInitiatedAtUtc.Value) : DateTimeOffset.UtcNow;
 
                 if (ec == 0)
                 {
                     order.RefundStatusCode = RefundStatusCode.Completed;
                     order.Refunded = true;
+                    order.RefundedAmount = refundedAmount;
                     order.RefundInitiatedAt = parsedRefundInitiatedAtUtc ?? DateTime.UtcNow;
                     order.RefundTxnId = string.IsNullOrWhiteSpace(refundTxnId) ? null : refundTxnId;
-                   
+
 
                     try
                     {
-                        await db.SaveChangesAsync();
+                     await db.SaveChangesAsync();
                     }
                     catch (Exception ex)
                     {
@@ -313,18 +308,19 @@ namespace GownApi.Endpoints
 
                     return Results.Ok(new
                     {
-                        orderId = order.Id,                  
-                        amount = order.RefundedAmount,
+                        orderId = order.Id,
+                        amount = order.Refund,
                         paymentTxnId = order.PaymentTxnId,
                         refundTxnId = order.RefundTxnId,
                         ec,
-                        em 
+                        em
                     });
 
                 }
 
                 order.RefundStatusCode = RefundStatusCode.Failed;
                 order.Refunded = false;
+           
 
                 await db.SaveChangesAsync();
 
@@ -334,10 +330,11 @@ namespace GownApi.Endpoints
                     refundStatusCode = order.RefundStatusCode,
                     paymentTxnId = order.PaymentTxnId,
                     ec,
-                    em 
+                    em
                 });
             })
                 .RequireAuthorization(policy => policy.RequireRole("manager"));
+        
         }
 
         private static List<KeyValuePair<string, string>> BuildRefundRequestPairs(
@@ -399,12 +396,13 @@ namespace GownApi.Endpoints
             text = text.Replace("\r", " ").Replace("\n", " ");
             return text.Length <= maxLen ? text : text[..maxLen] + "...";
         }
-        private static (int ec, string? em, string? ReTxnId,string? ReTxnTime) ParsePaystationResponse(string respText)
+        private static (int ec, string? em, string? ReTxnId,string? ReTxnTime, decimal? RefundedAmount) ParsePaystationResponse(string respText)
         {
             int ec = -1;
             string? em = null;
             string? ReTxnId = null;
             string? ReTxnTime = null;
+            decimal? RefundedAmount = null;
 
             try
             {
@@ -438,7 +436,19 @@ namespace GownApi.Endpoints
                 else if (root.TryGetProperty("PaystationTransactionID", out var t3))
                     ReTxnId = t3.GetString();
 
-                return (ec, em, ReTxnId, ReTxnTime);
+                if (root.TryGetProperty("RefundAmount", out var raEl))
+                {
+                    if (raEl.ValueKind == JsonValueKind.Number)
+                    {
+                        RefundedAmount = raEl.GetDecimal() / 100m;
+                    }
+                    else if (raEl.ValueKind == JsonValueKind.String &&
+                             decimal.TryParse(raEl.GetString(), out var ra))
+                    {
+                        RefundedAmount = ra / 100m;
+                    }
+                }
+                return (ec, em, ReTxnId, ReTxnTime, RefundedAmount);
             }
             catch { }
 
@@ -451,12 +461,15 @@ namespace GownApi.Endpoints
                 em = Get("em");
                 ReTxnId = Get("ti") ?? Get("TransactionID") ?? Get("PaystationTransactionID");
                 ReTxnTime = Get("TransactionTime");
+                var refundAmountText = Get("RefundAmount");
+                if (decimal.TryParse(refundAmountText, out var ra))
+                    RefundedAmount = ra / 100m;
 
-                return (ec, em, ReTxnId, ReTxnTime);
+                return (ec, em, ReTxnId, ReTxnTime, RefundedAmount);
             }
             catch
             {
-                return (-1, null, null,null);
+                return (-1, null, null, null, null);
             }
         }
 
