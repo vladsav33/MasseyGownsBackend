@@ -197,7 +197,7 @@ namespace GownApi.Endpoints
                 if (id != updatedOrder.Id)
                     return Results.BadRequest("ID in URL and body must match");
 
-                logger.LogInformation("GET /orders/id called with ID={id}", id);
+                logger.LogInformation("PUT /orders/id called with ID={id}", id);
                 var order = await db.orders.FindAsync(id);
                 if (order is null)
                     return Results.NotFound();

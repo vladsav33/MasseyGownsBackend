@@ -1,11 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using GownApi.Model;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
-using GownApi.Model;
-using Microsoft.AspNetCore.Authorization;
 
 
 namespace GownApi
@@ -64,10 +65,11 @@ namespace GownApi
             if (user.Active != true)
                 return Unauthorized("User is inactive.");
 
-       
-            if (user.PasswordHash != request.Password)
-                return Unauthorized("Invalid username or password.");
+            var hasher = new PasswordHasher<User>();
+            var result = hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
 
+            if (result != PasswordVerificationResult.Success)
+                return Unauthorized("Invalid username or password.");
             
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes("iREWTEWGfgweGERWgtGWgwET$#%q34GG#$%%3$##%GHBNBsgfdgwe345");
