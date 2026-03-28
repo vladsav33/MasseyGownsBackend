@@ -50,7 +50,7 @@ namespace GownApi.Endpoints
             });
 
             app.MapGet("/itemsonly", async (GownDb db) => {
-                return await db.items.ToListAsync();
+                return await db.items.OrderBy(x => x.Name).ToListAsync();
             });
 
             app.MapGet("/sizesonly", async (GownDb db) => {
@@ -90,7 +90,8 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/sku", async (GownDb db) =>
             {
                 var results = await db.skuDetail
-                    .FromSqlRaw(@"SELECT sk.id, i.name, s.size, s.labelsize, f.fit_type, h.name as hood, sk.count as count FROM sku sk
+                    .FromSqlRaw(@"SELECT sk.id, i.name, s.size, s.labelsize, f.fit_type, h.name as hood, ht.size as hat_size,
+                                  ht.labelsize as hat_label_size,  sk.count as count FROM sku sk
                                   LEFT JOIN items i
                                   ON i.id = sk.item_id
                                   LEFT JOIN sizes s
@@ -99,6 +100,8 @@ namespace GownApi.Endpoints
                                   ON f.id = sk.fit_id
                                   LEFT JOIN hood_type h
                                   ON h.id = sk.hood_id
+                                  LEFT JOIN hats ht
+                                  ON ht.id = sk.hat_id
                                   WHERE i.category <> 'Delivery' AND i.category <> 'Set' AND i.category <> 'Donation'
                                   ORDER BY i.name, f.fit_type, s.display_order, h.name")
                     .ToListAsync();

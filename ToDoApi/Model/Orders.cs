@@ -15,6 +15,8 @@
         public string Phone { get; set; }
         public decimal OrderAmount { get; set; }
         public int StudentId { get; set; }
+        public int? Height { get; set; }
+        public int? HeadSize { get; set; }
         public string? Message { get; set; }
         public bool? Paid { get; set; } 
         public int? PaymentMethod { get; set; }

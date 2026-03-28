@@ -7,6 +7,8 @@
         public string? Size { get; set; }
         public string? Labelsize { get; set; }
         public string? FitType { get; set; }
+        public string? HatSize { get; set; }
+        public string? HatLabelSize { get; set; }
         public string? Hood { get; set; }
         public int? Count { get; set; }
     }

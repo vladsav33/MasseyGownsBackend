@@ -20,7 +20,8 @@ namespace GownApi.Endpoints
                 List<OrderGet> result = new();
                 if (numbers == true)
                     result = await db.orderGets
-                        .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.payment_ec, o.payment_em,o.postcode, o.country, o.phone,
+                        .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.height, o.head_size, o.payment_ec,
+                                      o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
                                       o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
@@ -33,7 +34,8 @@ namespace GownApi.Endpoints
                         .ToListAsync();
                 else
                     result = await db.orderGets
-                        .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.payment_ec, o.payment_em,o.postcode, o.country, o.phone,
+                        .FromSqlRaw(@"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.height, o.head_size, o.payment_ec,
+                                      o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
                                       o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
@@ -213,7 +215,7 @@ namespace GownApi.Endpoints
                 order.OrderAmount = updatedOrder.OrderAmount;
                 order.StudentId = updatedOrder.StudentId;
                 order.Message = updatedOrder.Message;
-                order.Paid = updatedOrder.Paid;
+                order.Paid = updatedOrder.Paid ?? false;
                 order.PaymentMethod = updatedOrder.PaymentMethod;
                 order.PurchaseOrder = updatedOrder.PurchaseOrder;
                 order.OrderDate = updatedOrder.OrderDate;
@@ -227,6 +229,7 @@ namespace GownApi.Endpoints
                 order.Refund = updatedOrder.Refund;
                 order.AdminCharges = updatedOrder.AdminCharges;
                 order.PayBy = updatedOrder.PayBy;
+                order.PackNote = updatedOrder.PackNote;
 
                 await db.SaveChangesAsync();
                 return Results.Ok(order);

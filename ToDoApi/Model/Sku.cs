@@ -14,7 +14,6 @@ public partial class Sku
     public int? FitId { get; set; }
 
     public int? HoodId { get; set; }
-
     public int? Count { get; set; }
     public int? HatId { get; set; }
 }
