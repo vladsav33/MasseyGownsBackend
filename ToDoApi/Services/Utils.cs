@@ -72,7 +72,7 @@ namespace GownApi.Services
                 itemDto.Options = new List<Dictionary<string, object>>
                 {
                     new () {
-                        ["label"] = "My full height",
+                        ["label"] = "Height",
                         ["value"] = sizes[0],
                         ["choices"] = sizes
                     },
@@ -97,7 +97,7 @@ namespace GownApi.Services
             {
                 itemDto.Options = new List<Dictionary<string, object>> {
                                         new () {
-                                            ["label"] = "My full height",
+                                            ["label"] = "Height",
                                             ["value"] = sizes[0],
                                             ["choices"] = sizes
                                         }
@@ -171,7 +171,7 @@ namespace GownApi.Services
             {
                 new()
                 {
-                    ["label"] = "My full height",
+                    ["label"] = "Height",
                     ["value"] = sizes[0],
                     ["choices"] = sizes
                 },
