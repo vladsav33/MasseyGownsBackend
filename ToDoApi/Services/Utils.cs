@@ -136,13 +136,18 @@ namespace GownApi.Services
                 .Select(s => new { s.Id, Value = s.Size })
                 .ToListAsync();
 
-            var headSizes = await db.sizes
-                //.FromSqlRaw("SELECT s.size FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND sk.fit_id IS NULL",
-                //    items.Id)
-                .FromSqlRaw("SELECT s.id, s.size FROM sizes s INNER JOIN items i ON i.id = s.item_id WHERE s.item_id = {0} AND s.fit_id IS NULL",
-                    items.Id)
-                .Select(s => new { s.Id, Value = s.Size })
+            var headSizes = await db.hats
+                .FromSqlRaw("SELECT h.id, h.size, h.labelsize, h.display_order, h.item_id FROM hats h WHERE h.item_id = {0} ORDER BY h.display_order", items.Id)
                 .ToListAsync();
+
+
+            //var headSizes = await db.sizes
+            //    //.FromSqlRaw("SELECT s.size FROM sizes s INNER JOIN sku sk ON sk.size_id = s.id WHERE sk.item_id = {0} AND sk.fit_id IS NULL",
+            //    //    items.Id)
+            //    .FromSqlRaw("SELECT s.id, s.size FROM sizes s INNER JOIN items i ON i.id = s.item_id WHERE s.item_id = {0} AND s.fit_id IS NULL",
+            //        items.Id)
+            //    .Select(s => new { s.Id, Value = s.Size })
+            //    .ToListAsync();
 
             var hoods = await db.hoods
                 .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM items i INNER JOIN hood_type h ON h.item_id = i.id WHERE h.item_id = {0}",
