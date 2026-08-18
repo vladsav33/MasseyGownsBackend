@@ -40,10 +40,10 @@ namespace GownApi.Services
             var hats = await db.hats
                 .FromSqlRaw("SELECT h.id, h.size, h.labelsize, h.display_order, h.item_id FROM hats h WHERE h.item_id = {0} ORDER BY h.display_order", items.Id).ToListAsync();
 
-            var sql = "SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE NOT h.doctoral AND i.id = {0}";
+            var sql = "SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE NOT h.doctoral AND i.id = {0} ORDER BY h.name";
 
             if (items.DegreeId == 6 || items.DegreeId == 7)
-                sql = "SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE h.doctoral AND i.id = {0}";
+                sql = "SELECT h.id, h.name, h.item_id FROM hood_type h INNER JOIN items i ON h.item_id = i.id WHERE h.doctoral AND i.id = {0} ORDER BY h.name";
 
             var hoods = await db.hoods
                 //.FromSqlRaw("SELECT h.id, h.name, h.item_id FROM sku sk INNER JOIN hood_type h ON sk.hood_id = h.id WHERE sk.item_id = {0}",
@@ -150,7 +150,7 @@ namespace GownApi.Services
             //    .ToListAsync();
 
             var hoods = await db.hoods
-                .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM items i INNER JOIN hood_type h ON h.item_id = i.id WHERE h.item_id = {0}",
+                .FromSqlRaw("SELECT h.id, h.name, h.item_id FROM items i INNER JOIN hood_type h ON h.item_id = i.id WHERE h.item_id = {0} ORDER BY h.name",
                     items.Id)
                 .Select(h => new { h.Id, Value = h.Name })
                 .ToListAsync();
