@@ -15,6 +15,7 @@
         public string? PostalAddress { get; set; }
         public string? PostalAddress2 { get; set; }
         public string? PostalAddress3 { get; set; }
+        public string? Postcode { get; set; }
         public string? City { get; set; }
         public DateOnly? DespatchDate { get; set; }
         public DateOnly? DateSent { get; set; }
