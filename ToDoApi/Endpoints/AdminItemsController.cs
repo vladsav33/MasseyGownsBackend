@@ -214,7 +214,7 @@ namespace GownApi.Endpoints
                 return Results.Created($"/admin/prices/{updatedPrices.Id}", updatedPrices);
             });
 
-            _ = app.MapPut("/admin/prices/{$id}", async (int id, Prices updatedPrices, GownDb db) =>
+            _ = app.MapPut("/admin/prices/{id}", async (int id, Prices updatedPrices, GownDb db) =>
             {
                 var price = await db.prices.FindAsync(id);
                 if (price == null) return Results.NotFound();
