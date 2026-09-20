@@ -363,6 +363,53 @@ namespace GownApi.Endpoints
 
                 return Results.Ok(result);
             });
+
+            _ = app.MapPatch("/orders/{orderId}/items/{itemId}", async (int orderId, int itemId, SelectedItemInDto updatedItem, GownDb db, ILogger<Program> logger) =>
+            {
+                // Find the existing ordered item by its ordered-item Id (updatedItem.Id)
+                var orderedItem = await db.orderedItems.FirstOrDefaultAsync(oi => oi.Id == updatedItem.Id);
+                if (orderedItem is null)
+                    return Results.NotFound();
+
+                // Delete the existing ordered item
+                db.orderedItems.Remove(orderedItem);
+
+                // Find or create sku
+                var skuList = await SkuService.FindSkusAsync(db, updatedItem.ItemId, updatedItem.SizeId, updatedItem.FitId, updatedItem.HoodId, updatedItem.HatId);
+                if (!skuList.Any())
+                {
+                    var newSku = new Sku
+                    {
+                        ItemId = updatedItem.ItemId,
+                        SizeId = updatedItem.SizeId,
+                        FitId = updatedItem.FitId,
+                        HoodId = updatedItem.HoodId,
+                        HatId = updatedItem.HatId,
+                        Count = 0
+                    };
+                    db.Sku.Add(newSku);
+                    await db.SaveChangesAsync(); // ensure newSku.Id is populated
+                    skuList.Add(newSku);
+                    logger.LogInformation("Created new SKU with Id: {id}", newSku.Id);
+                }
+                else
+                {
+                    logger.LogInformation("Found Sku Id: {id}", skuList[0].Id);
+                }
+
+                var newOrderedItem = new OrderedItems
+                {
+                    OrderId = orderId,
+                    SkuId = skuList[0].Id,
+                    Quantity = 1,
+                    Hire = true,
+                    Cost = 0
+                };
+
+                await db.orderedItems.AddAsync(newOrderedItem);
+                await db.SaveChangesAsync();
+                return Results.Ok(orderedItem);
+            });
         }
     }
 }
