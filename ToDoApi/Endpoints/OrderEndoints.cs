@@ -56,6 +56,122 @@ namespace GownApi.Endpoints
                 return Results.Ok(resultList);
             });
 
+            app.MapGet("/orders/v2", async (GownDb db, bool? numbers = false) =>
+            {
+                var where = numbers == true ? "WHERE o.reference_no is not null" : "";
+
+                var sql = @"
+                    SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.height, o.head_size, o.payment_ec,
+                           o.payment_em, o.postcode, o.country, o.phone,
+                           o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
+                           c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
+                           o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                           o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at,
+                           oi.id as item_row_id, oi.cost as item_cost, oi.hire as item_hire, oi.quantity as item_quantity,
+                           i.id as item_item_id, i.name as item_name,
+                           s.id as item_size_id, s.size as item_size_name, s.labelsize as item_labelsize,
+                           d.labeldegree as item_labeldegree,
+                           f.fit_type as item_fit_name,
+                           h.name as item_hood_name, h.short_name as item_hood_short,
+                           ht.size as item_hat_size
+                    FROM orders o
+                    LEFT JOIN ceremonies c ON o.ceremony_id = c.id
+                    LEFT JOIN degrees d ON o.degree_id = d.id
+                    LEFT JOIN ordered_items oi ON oi.order_id = o.id
+                    LEFT JOIN sku sk ON sk.id = oi.sku_id
+                    LEFT JOIN items i ON i.id = sk.item_id
+                    LEFT JOIN sizes s ON s.id = sk.size_id
+                    LEFT JOIN fit f ON f.id = sk.fit_id
+                    LEFT JOIN hats ht ON ht.id = sk.hat_id
+                    LEFT JOIN hood_type h ON h.id = sk.hood_id
+                    " + where + @"
+                    ORDER BY o.reference_no DESC, oi.id";
+
+                var rows = await db.Database.SqlQueryRaw<OrderWithItemsRow>(sql)
+                    .ToListAsync();
+
+                var resultList = rows
+                    .GroupBy(r => r.Id)
+                    .Select(g =>
+                    {
+                        var first = g.First();
+                        var items = g
+                            .Where(r => r.ItemRowId.HasValue)
+                            .Select(r => new SelectedItemOut
+                            {
+                                Id = r.ItemRowId!.Value,
+                                ItemId = r.ItemItemId,
+                                SizeId = r.ItemSizeId,
+                                HatSize = r.ItemHatSize,
+                                ItemName = r.ItemName,
+                                SizeName = r.ItemSizeName,
+                                Labelsize = r.ItemLabelsize,
+                                Labeldegree = r.ItemLabeldegree,
+                                FitName = r.ItemFitName,
+                                HoodName = r.ItemHoodName,
+                                HoodShort = r.ItemHoodShort,
+                                Hire = r.ItemHire ?? false,
+                                Quantity = r.ItemQuantity ?? 0,
+                                Cost = r.ItemCost ?? 0
+                            })
+                            .ToArray();
+
+                        return new OrderDtoOut
+                        {
+                            Id = first.Id,
+                            FirstName = first.FirstName,
+                            LastName = first.LastName,
+                            Email = first.Email,
+                            Address = first.Address,
+                            City = first.City,
+                            PaymentEc = first.PaymentEc,
+                            PaymentEm = first.PaymentEm,
+                            Postcode = first.Postcode,
+                            Country = first.Country,
+                            Phone = first.Phone,
+                            OrderAmount = first.OrderAmount,
+                            StudentId = first.StudentId,
+                            Height = first.Height ?? 0,
+                            HeadSize = first.HeadSize ?? 0,
+                            Message = first.Message,
+                            Paid = first.Paid ?? false,
+                            PaymentMethod = first.PaymentMethod,
+                            PurchaseOrder = first.PurchaseOrder,
+                            OrderDate = first.OrderDate,
+                            Items = items,
+                            Amount = items.Sum(x => x.Cost),
+                            CeremonyId = first.CeremonyId,
+                            Ceremony = first.Ceremony,
+                            DegreeId = first.DegreeId,
+                            OrderType = first.OrderType,
+                            Note = first.Note,
+                            PackNote = first.PackNote,
+                            Changes = first.Changes,
+                            AmountPaid = first.AmountPaid,
+                            AmountOwning = first.AmountOwning,
+                            Donation = first.Donation,
+                            AccountCode = first.AccountCode,
+                            Freight = first.Freight,
+                            Refund = first.Refund,
+                            AdminCharges = first.AdminCharges,
+                            PayBy = first.PayBy,
+                            Status = first.Status,
+                            ReferenceNo = first.ReferenceNo,
+                            RefundedAmount = first.RefundedAmount,
+                            RefundTxnId = first.RefundTxnId,
+                            RefundedAt = first.RefundInitiatedAt,
+                            RefundEmailSentAt = first.RefundEmailSentAt,
+                            PaymentTxnId = first.PaymentTxnId,
+                            RefundLastEc = first.RefundLastEc,
+                            RefundLastEm = first.RefundLastEm,
+                            RefundStatusCode = first.RefundStatusCode
+                        };
+                    })
+                    .ToList();
+
+                return Results.Ok(resultList);
+            });
+
             app.MapGet("/api/admin/internal-forms", async (GownDb db) =>
             {
                 var list = await db.orders.Where(o => o.ReferenceNo != null && o.OrderType != "1")
@@ -403,12 +519,12 @@ namespace GownApi.Endpoints
                     SkuId = skuList[0].Id,
                     Quantity = 1,
                     Hire = true,
-                    Cost = 0
+                    Cost = updatedItem.Cost
                 };
 
                 await db.orderedItems.AddAsync(newOrderedItem);
                 await db.SaveChangesAsync();
-                return Results.Ok(orderedItem);
+                return Results.Ok(new { id = newOrderedItem.Id });
             });
         }
     }
