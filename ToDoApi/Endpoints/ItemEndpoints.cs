@@ -65,6 +65,14 @@ namespace GownApi.Endpoints
                 return await db.hood_type.ToListAsync();
             });
 
+            app.MapGet("/hatsonly", async (GownDb db) =>
+            {
+                return await db.hats.ToListAsync();
+                //.FromSqlRaw(@"SELECT h.id, h.item_id, h.size, h.labelsize, h.price
+                //             FROM hats h").ToListAsync();
+                //return results;
+            });
+
             app.MapGet("/itemsbydegree/{id}", async (int id, GownDb db) =>
             {
                 var results = await db.itemDegreeModels

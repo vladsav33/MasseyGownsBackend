@@ -526,6 +526,60 @@ namespace GownApi.Endpoints
                 await db.SaveChangesAsync();
                 return Results.Ok(new { id = newOrderedItem.Id });
             });
+
+            _ = app.MapPost("/orders/{orderId}/items", async (int orderId, SelectedItemInDto newItem, GownDb db, ILogger<Program> logger) =>
+            {
+                var order = await db.orders.FindAsync(orderId);
+                if (order is null)
+                    return Results.NotFound();
+
+                // Find or create sku
+                var skuList = await SkuService.FindSkusAsync(db, newItem.ItemId, newItem.SizeId, newItem.FitId, newItem.HoodId, newItem.HatId);
+                if (!skuList.Any())
+                {
+                    var newSku = new Sku
+                    {
+                        ItemId = newItem.ItemId,
+                        SizeId = newItem.SizeId,
+                        FitId = newItem.FitId,
+                        HoodId = newItem.HoodId,
+                        HatId = newItem.HatId,
+                        Count = 0
+                    };
+                    db.Sku.Add(newSku);
+                    await db.SaveChangesAsync(); // ensure newSku.Id is populated
+                    skuList.Add(newSku);
+                    logger.LogInformation("Created new SKU with Id: {id}", newSku.Id);
+                }
+                else
+                {
+                    logger.LogInformation("Found Sku Id: {id}", skuList[0].Id);
+                }
+
+                var orderedItem = new OrderedItems
+                {
+                    OrderId = orderId,
+                    SkuId = skuList[0].Id,
+                    Quantity = 1,
+                    Hire = true,
+                    Cost = newItem.Cost
+                };
+
+                await db.orderedItems.AddAsync(orderedItem);
+                await db.SaveChangesAsync();
+                return Results.Ok(new { id = orderedItem.Id });
+            });
+
+            _ = app.MapDelete("/orders/{orderId}/items/{itemId}", async (int orderId, int itemId, GownDb db) =>
+            {
+                var orderedItem = await db.orderedItems.FirstOrDefaultAsync(oi => oi.Id == itemId && oi.OrderId == orderId);
+                if (orderedItem is null)
+                    return Results.NotFound();
+
+                db.orderedItems.Remove(orderedItem);
+                await db.SaveChangesAsync();
+                return Results.NoContent();
+            });
         }
     }
 }
