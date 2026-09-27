@@ -16,6 +16,10 @@ public partial class HoodType
     public string? HoodNote { get; set; }
 
     public decimal? HoodBin { get; set; }
+    public string? Institution { get; set; }
+    public string? Category { get; set; }
+    public int? Stock { get; set; }
+    public string? Degree { get; set; }
 
     public virtual Item? Item { get; set; }
     public bool Doctoral { get; set; }

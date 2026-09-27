@@ -73,7 +73,7 @@ namespace GownApi.Endpoints
                            d.labeldegree as item_labeldegree,
                            f.fit_type as item_fit_name,
                            h.name as item_hood_name, h.short_name as item_hood_short,
-                           ht.size as item_hat_size
+                           ht.size as item_hat_size, ht.labelsize as hat_label
                     FROM orders o
                     LEFT JOIN ceremonies c ON o.ceremony_id = c.id
                     LEFT JOIN degrees d ON o.degree_id = d.id
