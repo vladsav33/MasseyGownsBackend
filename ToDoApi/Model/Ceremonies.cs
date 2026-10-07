@@ -2,7 +2,7 @@
 {
     public class Ceremonies
     {
-        public int Id { get; set; }
+        public int? Id { get; set; }
         public string Name { get; set; }
         public DateOnly? CeremonyDate { get; set; }
         public DateOnly? CeremonyDate2 { get; set; }

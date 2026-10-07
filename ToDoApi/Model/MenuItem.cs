@@ -1,8 +1,8 @@
-﻿namespace GownsApi
+﻿namespace GownApi.Model
 {
     public class MenuItem
     {
-        public int Id {  get; set; }
+        public int? Id {  get; set; }
         public string Name { get; set; }
         public List<MenuItem> Children { get; set; } = new List<MenuItem>();
     }

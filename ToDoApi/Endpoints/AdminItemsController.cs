@@ -307,6 +307,51 @@ namespace GownApi.Endpoints
 
                 return result;
             });
+
+            _ = app.MapGet("/admin/bulkceremony/itemcount/{id}", async (int id, GownDb db) =>
+            {
+                var sql = @"SELECT 'gown' AS category, gown_type || height AS item_size, COUNT(*) AS item_count
+                            FROM bulk_orders
+                            WHERE ceremony_id = @id AND gown_type || height IS NOT NULL
+                            GROUP BY item_size
+
+                            UNION ALL
+
+                            SELECT 'headwear' AS category, hat_type || head_size AS item_size, COUNT(*) AS item_count
+                            FROM bulk_orders
+                            WHERE ceremony_id = @id AND hat_type || head_size IS NOT NULL
+                            GROUP BY item_size
+
+                            UNION ALL
+
+                            SELECT 'hood' AS category, hood_type AS item_size, COUNT(*) AS item_count
+                            FROM bulk_orders
+                            WHERE ceremony_id = @id AND hood_type IS NOT NULL
+                            GROUP BY item_size
+                            ORDER BY item_size";
+
+
+                var allItems = await db.Database
+                    .SqlQueryRaw<ItemBulkCountDto>(sql, new NpgsqlParameter("@id", id))
+                    .ToListAsync();
+
+                // Group rows into Dictionary<string, List<ItemCountDto>>
+                var result = allItems
+                    .GroupBy(x => x.Category)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.ToList()
+                    );
+
+                // Ensure keys exist even if a category returned zero items from the DB
+                string[] expectedCategories = ["headwear", "gown", "hood"];
+                foreach (var cat in expectedCategories)
+                {
+                    result.TryAdd(cat, new List<ItemBulkCountDto>());
+                }
+
+                return result;
+            });
         }
         public class ItemsUpdateDto
         {
@@ -316,6 +361,13 @@ namespace GownApi.Endpoints
 
         public class ItemCountDto
         {
+            public string? ItemSize { get; set; }
+            public int ItemCount { get; set; }
+        }
+
+        public class ItemBulkCountDto
+        {
+            public string Category { get; set; }
             public string? ItemSize { get; set; }
             public int ItemCount { get; set; }
         }
