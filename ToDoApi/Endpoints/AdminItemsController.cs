@@ -200,6 +200,22 @@ namespace GownApi.Endpoints
                 return Results.Ok(itemsDetails);
             });
 
+            _ = app.MapGet("/admin/items/bulkceremony/{id}", async (int id, GownDb db) => {
+
+                var sql = @"SELECT bo.id, bo.first_name, bo.last_name, gown_type || height as gown_size, '' as stole_size,
+                            hat_type || head_size as hat_size, hood_type as hood_name, ucol_sash as sash_name
+                            FROM ceremonies c JOIN bulk_orders bo ON c.id=bo.ceremony_id WHERE c.id=@id";
+
+                var param = new NpgsqlParameter("@id", id);
+
+                var itemsDetails = await db.itemDetails
+                    .FromSqlRaw(sql, param)
+                    //.AsNoTracking()
+                    .ToListAsync();
+
+                return Results.Ok(itemsDetails);
+            });
+
             _ = app.MapGet("/admin/prices", async (GownDb db) =>
             {
                 var results = await db.prices.ToListAsync();
