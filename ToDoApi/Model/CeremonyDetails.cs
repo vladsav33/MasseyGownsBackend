@@ -6,7 +6,7 @@
         public string Name { get; set; }
         public DateOnly? CeremonyDate { get; set; }
         public DateOnly? CeremonyDate2 { get; set; }
-        public int? CerenonyNo { get; set; }
+        public int? CeremonyNo { get; set; }
         public DateOnly? DueDate { get; set; }
         public bool Visible { get; set; }
         public string? IdCode { get; set; }

@@ -3,6 +3,7 @@ using DocumentFormat.OpenXml.InkML;
 using DocumentFormat.OpenXml.Office2010.Excel;
 using GownApi.Model;
 using GownApi.Model.Dto;
+using Humanizer;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -66,10 +67,43 @@ namespace GownApi.Endpoints
                     logger.LogInformation("POST /admin/ceremonies called with Body={@updatedCeremony}", ceremony);
                     try
                     {
-                        db.ceremonies.Add(ceremony);
+                        // Create a fresh entity without assigning Id
+                        var entity = new Ceremonies
+                        {
+                            Name = ceremony.Name,
+                            CeremonyDate = ceremony.CeremonyDate,
+                            CeremonyDate2 = ceremony.CeremonyDate2,
+                            CeremonyNo = ceremony.CeremonyNo,
+                            DueDate = ceremony.DueDate,
+                            Visible = ceremony.Visible,
+                            IdCode = ceremony.IdCode,
+                            InstitutionName = ceremony.InstitutionName,
+                            CourierAddress = ceremony.CourierAddress,
+                            PostalAddress = ceremony.PostalAddress,
+                            PostalAddress2 = ceremony.PostalAddress2,
+                            PostalAddress3 = ceremony.PostalAddress3,
+                            Postcode = ceremony.Postcode,
+                            City = ceremony.City,
+                            DespatchDate = ceremony.DespatchDate,
+                            DateSent = ceremony.DateSent,
+                            ReturnDate = ceremony.ReturnDate,
+                            DateReturned = ceremony.DateReturned,
+                            Organiser = ceremony.Organiser,
+                            Phone = ceremony.Phone,
+                            Email = ceremony.Email,
+                            InvoiceEmail = ceremony.InvoiceEmail,
+                            PriceCode = ceremony.PriceCode,
+                            Freight = ceremony.Freight,
+                            CollectionTime = ceremony.CollectionTime,
+                            Content = ceremony.Content,
+                            AccountCode = ceremony.AccountCode,
+
+                            // Notice: Do NOT assign entity.Id = dto.Id!
+                        };
+                        db.ceremonies.Add(entity);
                         await db.SaveChangesAsync();
 
-                        return Results.Created($"/ceremonies/{ceremony.Id}", ceremony);
+                        return Results.Created($"/ceremonies/{entity.Id}", entity);
                     } catch (DbUpdateException ex) when (
                         ex.InnerException is PostgresException pg &&
                         pg.SqlState == PostgresErrorCodes.UniqueViolation)

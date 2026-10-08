@@ -51,7 +51,7 @@ public partial class Ceremony
 
     public DateOnly? CeremonyDate2 { get; set; }
 
-    public int? CerenonyNo { get; set; }
+    public int? CeremonyNo { get; set; }
 
     public string? PostalAddress2 { get; set; }
 
