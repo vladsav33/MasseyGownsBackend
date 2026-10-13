@@ -42,6 +42,7 @@ namespace GownApi
         public DbSet<HiredNotGraduated> hiredNotGraduated { get; set; }
         public DbSet<GraduatedNotHired> graduatedNotHired { get; set; }
         public DbSet<EmailQueueItems> EmailQueueItems { get; set; }
+        public DbSet<ImportSize> ImportSize { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

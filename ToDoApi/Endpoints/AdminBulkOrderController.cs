@@ -22,9 +22,11 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/bulkorders/{id}", async (int id, GownDb db) =>
             {
                 var sql = @"
-                    SELECT bo.id, c.id_code, bo.hood_type FROM ceremonies c
+                    SELECT bo.id, c.id_code, bo.first_name, bo.last_name, bo.gown_type, bo.hat_type, bo.ucol_sash, bo.height, bo.head_size, bo.hood_type
+                    FROM ceremonies c
                     INNER JOIN bulk_orders bo ON bo.ceremony_id = c.id
-                    WHERE c.id = @id";
+                    WHERE c.id = @id
+                    ORDER BY bo.last_name, bo.first_name";
 
                 var param = new NpgsqlParameter("@id", id);
 
@@ -35,6 +37,12 @@ namespace GownApi.Endpoints
 
                 return Results.Ok(result);
 
+            });
+
+            _ = app.MapGet("/admin/importsize", async (GownDb db) =>
+            {
+                var result = await db.ImportSize.ToListAsync();
+                return Results.Ok(result);
             });
 
             app.MapPost("/admin/bulkorders", async (List<BulkOrderDto> bulkOrdersDto, GownDb db, ILogger<Program> logger) =>
@@ -73,8 +81,8 @@ namespace GownApi.Endpoints
 
                         bulkOrder.Add(new BulkOrder
                         {
-                            LastName = order.Name,
-                            //FirstName = order.FirstName,
+                            LastName = order.LastName,
+                            FirstName = order.FirstName,
                             HeadSize = order.Headsize,
                             HatType = order.Hattype,
                             Height = order.Height,
