@@ -13,17 +13,23 @@ namespace GownApi.Endpoints
     {
         public static void AdminHoodEndpoints(this WebApplication app)
         {
-            app.MapGet("/admin/hoods/{id}", async (int id, GownDb db) =>
+            _ = app.MapGet("/admin/hoods/{id}", async (int id, GownDb db) =>
             {
                 return await db.hood_type.Where(c => c.ItemId == id).OrderBy(c => c.Name).ToListAsync();
             });
 
-            app.MapGet("/admin/hoods", async (GownDb db) =>
+            _ = app.MapGet("/admin/hoods", async (GownDb db) =>
             {
                 return await db.hood_type.Where(c => c.ItemId == null).OrderBy(c => c.Name).ToListAsync();
             });
 
-            app.MapPut("/admin/hoods/{id}", async (int id, HoodType updated, GownDb db, ILogger<Program> logger) =>
+            _ = app.MapGet("/admin/allhoods", async (GownDb db) =>
+            {
+                return await db.hood_type.OrderBy(c => c.Name).ToListAsync();
+            });
+
+
+            _ = app.MapPut("/admin/hoods/{id}", async (int id, HoodType updated, GownDb db, ILogger<Program> logger) =>
             {
                 var hood = await db.hood_type.FindAsync(updated.Id);
 
