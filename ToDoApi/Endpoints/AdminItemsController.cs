@@ -203,7 +203,7 @@ namespace GownApi.Endpoints
             _ = app.MapGet("/admin/items/bulkceremony/{id}", async (int id, GownDb db) => {
 
                 var sql = @"SELECT bo.id, bo.first_name, bo.last_name, gown_type || height as gown_size, '' as stole_size,
-                            hat_type || head_size as hat_size, hood_type as hood_name, ucol_sash as sash_name
+                            hat_type || head_size as hat_size, hood_type as hood_name, hood_code, ucol_sash as sash_name
                             FROM ceremonies c JOIN bulk_orders bo ON c.id=bo.ceremony_id WHERE c.id=@id
                             ORDER BY bo.last_name, bo.first_name";
 
@@ -311,24 +311,24 @@ namespace GownApi.Endpoints
 
             _ = app.MapGet("/admin/bulkceremony/itemcount/{id}", async (int id, GownDb db) =>
             {
-                var sql = @"SELECT 'gown' AS category, gown_type || height AS item_size, COUNT(*) AS item_count
+                var sql = @"SELECT 'gown' AS category, '' AS hood_code, gown_type || height AS item_size, COUNT(*) AS item_count
                             FROM bulk_orders
                             WHERE ceremony_id = @id AND gown_type || height IS NOT NULL
                             GROUP BY item_size
 
                             UNION ALL
 
-                            SELECT 'headwear' AS category, hat_type || head_size AS item_size, COUNT(*) AS item_count
+                            SELECT 'headwear' AS category, '' AS hood_code, hat_type || head_size AS item_size, COUNT(*) AS item_count
                             FROM bulk_orders
                             WHERE ceremony_id = @id AND hat_type || head_size IS NOT NULL
                             GROUP BY item_size
 
                             UNION ALL
 
-                            SELECT 'hood' AS category, hood_type AS item_size, COUNT(*) AS item_count
+                            SELECT 'hood' AS category, hood_code, hood_type AS item_size, COUNT(*) AS item_count
                             FROM bulk_orders
                             WHERE ceremony_id = @id AND hood_type IS NOT NULL
-                            GROUP BY item_size
+                            GROUP BY item_size, hood_code
                             ORDER BY item_size";
 
 
@@ -370,6 +370,7 @@ namespace GownApi.Endpoints
         {
             public string Category { get; set; }
             public string? ItemSize { get; set; }
+            public string? HoodCode { get; set; }
             public int ItemCount { get; set; }
         }
     }

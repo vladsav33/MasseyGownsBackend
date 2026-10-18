@@ -22,7 +22,7 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/bulkorders/{id}", async (int id, GownDb db) =>
             {
                 var sql = @"
-                    SELECT bo.id, c.id_code, bo.first_name, bo.last_name, bo.gown_type, bo.hat_type, bo.ucol_sash, bo.height, bo.head_size, bo.hood_type
+                    SELECT bo.id, c.id_code, bo.first_name, bo.last_name, bo.gown_type, bo.hat_type, bo.ucol_sash, bo.height, bo.head_size, bo.hood_type, bo.hood_code
                     FROM ceremonies c
                     INNER JOIN bulk_orders bo ON bo.ceremony_id = c.id
                     WHERE c.id = @id
@@ -88,6 +88,7 @@ namespace GownApi.Endpoints
                             Height = order.Height,
                             GownType = order.Gowntype,
                             HoodType = order.Hood,
+                            HoodCode = order.HoodCode,
                             UcolSash = order.UcolSash,
                             CeremonyId = ceremony.Id
                         });

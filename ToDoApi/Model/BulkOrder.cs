@@ -20,6 +20,7 @@ public partial class BulkOrder
     public string? GownType { get; set; }
 
     public string? HoodType { get; set; }
+    public string? HoodCode { get; set; }
 
     public string? UcolSash { get; set; }
 
