@@ -21,15 +21,15 @@ namespace GownApi.Endpoints
             app.MapGet("/admin/ceremonies", async (GownDb db) => {
                 var sql = @"
                     SELECT c.*, p.hood, p.gown, p.hat, p.xtra_hood, p.ucol_sash,
-	                COUNT(bo.hat_type) AS hat_count,
-                    COUNT(bo.gown_type) AS gown_count,
-                    COUNT(bo.hood_type) AS hood_count,
-                    COUNT(bo.ucol_sash) AS ucol_count
+                    COUNT(CASE WHEN bo.hat_type IS NOT NULL AND TRIM(bo.hat_type) <> '' THEN 1 END) AS hat_count,
+                    COUNT(CASE WHEN bo.gown_type IS NOT NULL AND TRIM(bo.gown_type) <> '' THEN 1 END) AS gown_count,
+                    COUNT(CASE WHEN bo.hood_type IS NOT NULL AND TRIM(bo.hood_type) <> '' THEN 1 END) AS hood_count,
+                    COUNT(CASE WHEN bo.ucol_sash IS NOT NULL AND TRIM(bo.ucol_sash) <> '' THEN 1 END) AS ucol_count
                     FROM ceremonies c
                     LEFT JOIN bulk_orders bo
                     ON c.id = bo.ceremony_id
                     LEFT JOIN prices p
-                    ON c.price_id = p.id
+                    ON c.price_code = p.id
                     GROUP BY c.id, p.hood, p.gown, p.hat, p.xtra_hood, p.ucol_sash
                     ORDER BY c.name";
 
@@ -44,10 +44,11 @@ namespace GownApi.Endpoints
             app.MapGet("admin/ceremonies/bulk/{id}", async (int id, GownDb db) =>
             {
                 var sql = @"
-                    SELECT COUNT(hat_type) AS hat_count,
-                           COUNT(gown_type) AS gown_count,
-                           COUNT(hood_type) AS hood_count,
-                           COUNT(ucol_sash) AS ucol_count
+                    SELECT
+                    COUNT(CASE WHEN hat_type IS NOT NULL AND TRIM(hat_type) <> '' THEN 1 END) AS hat_count,
+                    COUNT(CASE WHEN gown_type IS NOT NULL AND TRIM(gown_type) <> '' THEN 1 END) AS gown_count,
+                    COUNT(CASE WHEN hood_type IS NOT NULL AND TRIM(hood_type) <> '' THEN 1 END) AS hood_count,
+                    COUNT(CASE WHEN ucol_sash IS NOT NULL AND TRIM(ucol_sash) <> '' THEN 1 END) AS ucol_count
                     FROM bulk_orders
                     WHERE ceremony_id = @id";
 
