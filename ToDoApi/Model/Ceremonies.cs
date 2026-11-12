@@ -31,6 +31,5 @@
         public string? CollectionTime { get; set; }
         public string? Content { get; set; }
         public int AccountCode { get; set; }
-        public string? ImportName { get; set; }
     }
 }
