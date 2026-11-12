@@ -8,6 +8,7 @@ public partial class HoodType
     public int Id { get; set; }
 
     public string Name { get; set; } = null!;
+    public string? NameImport { get; set; }
 
     public int? ItemId { get; set; }
 

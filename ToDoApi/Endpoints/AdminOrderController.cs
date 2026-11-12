@@ -1,4 +1,6 @@
-﻿using GownApi.Model;
+﻿using DocumentFormat.OpenXml.Office2010.PowerPoint;
+using DocumentFormat.OpenXml.Wordprocessing;
+using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Humanizer;
@@ -98,6 +100,568 @@ namespace GownApi.Endpoints
 
                 return Results.Ok(resultList);
             });
+
+            _ = app.MapPost("/admin/indorder", async (List<OrderDtoIn> ordersDto, GownDb db, ILogger<Program> logger) =>
+            {
+                //logger.LogInformation("POST /admin/indorder called with {Count} orders, Body={@ordersDto}", ordersDto.Count, ordersDto);
+
+                if (ordersDto is null || ordersDto.Count == 0)
+                    return Results.BadRequest("No orders supplied.");
+
+
+                // All-or-nothing: if any order fails, none are saved.
+                await using var transaction = await db.Database.BeginTransactionAsync();
+                try
+                {
+                    // Each order paired with the ordered items resolved from its DTO (OrderId set after insert)
+                    var orders = new List<(Orders Order, List<OrderedItems> Items)>(ordersDto.Count);
+
+                    // Ceremonies with an ImportName, used to match each order's University
+                    var ceremonies = await db.ceremonies
+                        .Where(c => c.Id != null && c.NameImport != null && c.NameImport != "")
+                        .OrderBy(c => c.Id)
+                        .Select(c => new { Id = c.Id!.Value, c.NameImport })
+                        .ToListAsync();
+
+                    var skipped = 0;
+                    foreach (var orderDto in ordersDto)
+                    {
+                        var university = orderDto.University?.Trim();
+                        var matches = string.IsNullOrEmpty(university)
+                            ? []
+                            : ceremonies
+                                .Where(c => c.NameImport!.Contains(university, StringComparison.OrdinalIgnoreCase))
+                                .ToList();
+
+                        if (matches.Count == 0)
+                        {
+                            logger.LogWarning("Order {OrderNumber} skipped: University '{University}' does not match any ceremony ImportName", orderDto.OrderNumber, orderDto.University);
+                            skipped++;
+                            continue;
+                        }
+
+                        if (matches.Count > 1)
+                            logger.LogWarning("Order {OrderNumber}: University '{University}' matches {Count} ceremonies ({Ids}); using {CeremonyId}",
+                                orderDto.OrderNumber, orderDto.University, matches.Count, string.Join(", ", matches.Select(m => m.Id)), matches[0].Id);
+
+                        var ceremonyId = matches[0].Id;
+
+                        var orderedItems = new List<OrderedItems>();
+
+                        AddIfNotNull(orderedItems, await ProcessTrencherAsync(orderDto, db, logger));
+                        orderedItems.AddRange(await ProcessGownAsync(orderDto, db, logger));
+                        AddIfNotNull(orderedItems, await ProcessHoodAsync(orderDto, db, logger));
+                        AddIfNotNull(orderedItems, await ProcessStoleAsync(orderDto, db, logger));
+
+                        var order = await OrderMapper.ToEntity(orderDto, ceremonyId, db);
+
+                        //logger.LogInformation("Note length: {Length}", order.Note?.Length ?? 0);
+
+                        orders.Add((order, orderedItems));
+                    }
+
+                    // Insert the orders first so the database generates their ids
+                    await db.orders.AddRangeAsync(orders.Select(o => o.Order));
+                    await db.SaveChangesAsync();
+
+                    // Now link each ordered item to its newly created order id
+                    var itemCount = 0;
+                    foreach (var (order, orderedItems) in orders)
+                    {
+                        foreach (var orderedItem in orderedItems)
+                        {
+                            orderedItem.OrderId = order.Id;
+                            db.orderedItems.Add(orderedItem);
+                            itemCount++;
+                        }
+                    }
+
+                    await db.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    logger.LogInformation("POST /admin/indorder created {Count} orders with {ItemCount} ordered items, skipped {Skipped}", orders.Count, itemCount, skipped);
+
+                    return Results.Created("/admin/orders", new
+                    {
+                        message = "Orders created successfully",
+                        inserted = orders.Count,
+                        skipped
+                    });
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    logger.LogError(ex, "Error creating orders in POST /admin/indorder");
+                    return Results.Problem(
+                        title: "An error occurred while creating the orders.",
+                        detail: ex.InnerException?.Message ?? ex.Message);
+                }
+            });
         }
+
+        private static void AddIfNotNull(List<OrderedItems> list, OrderedItems? orderedItem)
+        {
+            if (orderedItem != null)
+                list.Add(orderedItem);
+        }
+
+        // Builds an ordered item for the SKU. OrderId is filled in once the order has been inserted.
+        private static OrderedItems ToOrderedItem(Items item, Sku sku) => new OrderedItems
+        {
+            SkuId = sku.Id,
+            Quantity = 1,
+            Hire = item.IsHiring,
+            Cost = (item.IsHiring ? item.HirePrice : item.BuyPrice) ?? 0
+        };
+
+        private static async Task<OrderedItems?> ProcessTrencherAsync(OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+
+            if (orderDto.Trencher is { Count: > 0 })
+            {
+                Items? item = null;
+                Hats? size = null;
+                if (orderDto.Trencher.TryGetValue("Name", out var name) && name != null)
+                {
+                    //logger.LogInformation("Order {OrderNumber} Trencher Name={Name}", orderDto.OrderNumber, name);
+
+                    var itemName = name?.Trim().ToLower();
+                    item = string.IsNullOrEmpty(itemName)
+                                                    ? null
+                                                    : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == itemName);
+
+                    if (item is null)
+                        logger.LogWarning("Order {OrderNumber} Trencher item '{Name}' not found", orderDto.OrderNumber, name);
+                    //else
+                    //    logger.LogInformation("Order {OrderNumber} Trencher item found: Id={ItemId}, Name={ItemName}", orderDto.OrderNumber, item.Id, item.Name);
+                }
+
+                if (orderDto.Trencher.TryGetValue("Size", out var hatSize) && hatSize != null)
+                {
+                    var itemSize = hatSize?.Trim().ToLower();
+                    size = string.IsNullOrEmpty(itemSize)
+                        ? null
+                        : await db.hats.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize);
+                    //logger.LogInformation("Order {OrderNumber} Trencher Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, hatSize, size?.Id, size?.Size);
+                }
+                if (item != null && size != null)
+                {
+                    var skus = await SkuService.FindSkusAsync(db, item.Id, size.Id);
+                    Sku sku;
+                    if (skus.Count > 0)
+                    {
+                        sku = skus[0];
+                        //logger.LogInformation("SKU found for Order {OrderNumber} Trencher: ItemId={ItemId}, SizeId={SizeId}, SKU Id={SkuId}", orderDto.OrderNumber, item.Id, size.Id, skus[0].Id);
+                    }
+                    else
+                    {
+                        logger.LogWarning("SKU not found for Order {OrderNumber} Trencher: ItemId={ItemId}, SizeId={SizeId}", orderDto.OrderNumber, item.Id, size.Id);
+                        // Optionally, you could create a new SKU if it doesn't exist
+                        sku = await SkuService.InsertSkuAsync(db, item.Id, size.Id, null, null, size.Id);
+                        logger.LogInformation("Inserted new SKU for Order {OrderNumber} Trencher: ItemId={ItemId}, SizeId={SizeId}", orderDto.OrderNumber, item.Id, size.Id);
+                    }
+                    return ToOrderedItem(item, sku);
+                }
+
+            }
+            else
+            {
+                logger.LogInformation("Order {OrderNumber} Trencher: <empty>", orderDto.OrderNumber);
+            }
+            return null;
+        }
+
+        private static async Task<List<OrderedItems>> ProcessGownAsync(OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+            var orderedItems = new List<OrderedItems>();
+
+            if (orderDto.Gown is { Length: > 0 })
+            {
+                foreach (var gown in orderDto.Gown)
+                {
+                    if (gown.TryGetValue("Type", out var type) && type != null && type.Trim().ToLower().Contains("gown"))
+                        AddIfNotNull(orderedItems, await RetrieveGownAsync(gown, orderDto, db, logger));
+                    if (type != null && type.Trim().ToLower().Contains("doctoral set"))
+                        AddIfNotNull(orderedItems, await RetrieveSetAsync(gown, orderDto, db, logger));
+                }
+            }
+            else
+            {
+                //logger.LogInformation("Order {OrderNumber} Gown: <empty>", orderDto.OrderNumber);
+            }
+            return orderedItems;
+        }
+
+        private static async Task<OrderedItems?> RetrieveGownAsync(Dictionary<string, string?> gown, OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+            Items? item = null;
+            Sizes? size = null;
+            Fit? fit = null;
+
+            if (gown.TryGetValue("Type", out var type) && type != null)
+            {
+                //logger.LogInformation("Order {OrderNumber} Gown Type={Type}", orderDto.OrderNumber, type);
+
+                var itemName = type?.Trim().ToLower();
+                item = string.IsNullOrEmpty(itemName)
+                                                ? null
+                                                : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == itemName);
+
+                //if (item is null)
+                //    logger.LogWarning("Order {OrderNumber} Gown item '{Name}' not found", orderDto.OrderNumber, type);
+                //else
+                //    logger.LogInformation("Order {OrderNumber} Gown item found: Id={ItemId}, Name={ItemName}", orderDto.OrderNumber, item.Id, item.Name);
+            }
+
+            if (gown.TryGetValue("FitType", out var gownFit) && gownFit != null)
+            {
+                var itemFit = gownFit?.Trim().ToLower();
+                fit = string.IsNullOrEmpty(itemFit)
+                    ? null
+                    : await db.fit.FirstOrDefaultAsync(f => f.FitType.ToLower().Contains(itemFit));
+
+                if (fit == null)
+                {
+                    logger.LogWarning("Order {OrderNumber} Gown fit '{FitType}' not found", orderDto.OrderNumber, gownFit);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Fit={Fit} Fit Id={id}, Fit Name={Name}", orderDto.OrderNumber, gownFit, fit?.Id, fit?.FitType);
+            }
+
+            if (gown.TryGetValue("Size", out var gownSize) && gownSize != null && fit != null)
+            {
+                var itemSize = gownSize?.Trim().ToLower();
+                size = string.IsNullOrEmpty(itemSize)
+                    ? null
+                    : await db.sizes.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize && s.FitId == fit.Id);
+
+                if (size == null)
+                {
+                    logger.LogWarning("Order {OrderNumber} Gown size '{Size}' not found for fit '{FitType}'", orderDto.OrderNumber, gownSize, gownFit);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
+            }
+
+            if (item != null && size != null && fit != null)
+            {
+                var skus = await SkuService.FindSkusAsync(db, item.Id, size.Id, fit.Id);
+                Sku sku;
+                if (skus.Count > 0)
+                {
+                    sku = skus[0];
+                    //logger.LogInformation("SKU found for Order {OrderNumber} Gown: ItemId={ItemId}, SizeId={SizeId}, FitId={FitId}, SKU Id={SkuId}", orderDto.OrderNumber, item.Id, size.Id, fit.Id, skus[0].Id);
+                }
+                else
+                {
+                    logger.LogWarning("SKU not found for Order {OrderNumber} Gown: ItemId={ItemId}, SizeId={SizeId}, FitId={FitId}", orderDto.OrderNumber, item.Id, size.Id, fit.Id);
+                    // Optionally, you could create a new SKU if it doesn't exist
+                    sku = await SkuService.InsertSkuAsync(db, item.Id, size.Id, fit.Id);
+                    logger.LogInformation("Inserted new SKU for Order {OrderNumber} Gown: ItemId={ItemId}, SizeId={SizeId}, FitId={FitId}", orderDto.OrderNumber, item.Id, size.Id, fit.Id);
+                }
+                return ToOrderedItem(item, sku);
+            }
+            return null;
+        }
+
+        private static async Task<OrderedItems?> RetrieveSetAsync(Dictionary<string, string?> gown, OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+            Items? item = null;
+            Sizes? size = null;
+            Hats? hat = null;
+            HoodType? hood = null;
+
+            if (gown.TryGetValue("Type", out var type) && type != null)
+            {
+                //logger.LogInformation("Order {OrderNumber} Gown Type={Type}", orderDto.OrderNumber, type);
+
+                var itemName = type?.Trim().ToLower();
+                if (itemName == "doctoral set new")
+                    itemName = "doctoral degree set";
+
+                item = string.IsNullOrEmpty(itemName)
+                                                ? null
+                                                : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == itemName);
+
+                if (item is null)
+                    logger.LogWarning("Order {OrderNumber} Set item '{Name}' not found", orderDto.OrderNumber, type);
+                else
+                    logger.LogInformation("Order {OrderNumber} Set item found: Id={ItemId}, Name={ItemName}", orderDto.OrderNumber, item.Id, item.Name);
+            }
+
+            if (gown.TryGetValue("SetHatSize", out var setHat) && setHat != null)
+            {
+                var itemHat = setHat?.Trim().ToLower();
+                hat = string.IsNullOrEmpty(itemHat)
+                    ? null
+                    : await db.hats.FirstOrDefaultAsync(h => h.Size.ToLower().Contains(itemHat));
+
+                if (hat == null)
+                {
+                    logger.LogWarning("Order {OrderNumber} Set hat '{HatSize}' not found", orderDto.OrderNumber, setHat);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Fit={Fit} Fit Id={id}, Fit Name={Name}", orderDto.OrderNumber, gownFit, fit?.Id, fit?.FitType);
+            }
+
+            if (gown.TryGetValue("Size", out var gownSize) && gownSize != null)
+            {
+                var itemSize = gownSize?.Trim().ToLower();
+                size = string.IsNullOrEmpty(itemSize)
+                    ? null
+                    : await db.sizes.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize);
+
+                if (size == null)
+                {
+                    logger.LogWarning("Order {OrderNumber} Set size '{Size}' not found'", orderDto.OrderNumber, gownSize);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
+            }
+
+            if (gown.TryGetValue("SetHood", out var setHood) && setHood != null)
+            {
+                var itemHood = setHood?.Trim().ToLower();
+                hood = string.IsNullOrEmpty(itemHood)
+                    ? null
+                    : await db.hood_type.FirstOrDefaultAsync(s => s.Name.ToLower() == itemHood);
+
+                if (hood == null)
+                {
+                    logger.LogWarning("Order {OrderNumber} Set hood '{Hood}' not found'", orderDto.OrderNumber, hood);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
+            }
+
+            if (item != null && size != null && hat != null && hood != null)
+            {
+                var skus = await SkuService.FindSkusAsync(db, item.Id, size.Id, null, hood.Id, hat.Id);
+                Sku sku;
+                if (skus.Count > 0)
+                {
+                    sku = skus[0];
+                    //logger.LogInformation("SKU found for Order {OrderNumber} Gown: ItemId={ItemId}, SizeId={SizeId}, FitId={FitId}, SKU Id={SkuId}", orderDto.OrderNumber, item.Id, size.Id, fit.Id, skus[0].Id);
+                }
+                else
+                {
+                    logger.LogWarning("SKU not found for Order {OrderNumber} Set: ItemId={ItemId}, SizeId={SizeId}, HatId={HatId}, HoodId={HoodId}", orderDto.OrderNumber, item.Id, size.Id, hat.Id, hood.Id);
+                    // Optionally, you could create a new SKU if it doesn't exist
+                    sku = await SkuService.InsertSkuAsync(db, item.Id, size.Id, null, hood.Id, hat.Id);
+                    logger.LogInformation("Inserted new SKU for Order {OrderNumber} Set: ItemId={ItemId}, SizeId={SizeId}, HatId={HatId}, HoodId={HoodId}", orderDto.OrderNumber, item.Id, size.Id, hat.Id, hood.Id);
+                }
+                return ToOrderedItem(item, sku);
+            }
+            else
+            {
+                logger.LogWarning("Order {OrderNumber} Set: Missing item, size, or hat. ItemId={ItemId}, SizeId={SizeId}, HatId={HatId}", orderDto.OrderNumber, item?.Id, size?.Id, hat?.Id);
+            }
+            return null;
+        }
+
+        private static async Task<OrderedItems?> ProcessHoodAsync(OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+            if (orderDto.Hood is { Count: > 0 })
+            {
+                if (orderDto.Hood.TryGetValue("Type", out var typeHood) && typeHood != null && typeHood.Trim().ToLower().Contains("phd"))
+                {
+                    return await RetrievePhdHoodAsync(orderDto.Hood, orderDto, db, logger);
+                } else if (orderDto.Hood.TryGetValue("Type", out var typePhd) && typePhd != null && typePhd.Trim().ToLower().Contains("hood"))
+                {
+                    return await RetrieveHoodAsync(orderDto.Hood, orderDto, db, logger);
+                }
+            }
+            return null;
+        }
+
+        private static async Task<OrderedItems?> RetrieveHoodAsync(Dictionary<string, string?> hoodIn, OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+            HoodType? hood = null;
+            Items? item = null;
+
+            if (hoodIn.TryGetValue("Type", out var type) && type != null)
+            {
+                //logger.LogInformation("Order {OrderNumber} Gown Type={Type}", orderDto.OrderNumber, type);
+
+                var itemName = type?.Trim().ToLower();
+
+                item = string.IsNullOrEmpty(itemName)
+                                                ? null
+                                                : await db.items.FirstOrDefaultAsync(i => i.NameImport.Trim().ToLower().Contains(itemName));
+
+                if (item is null)
+                    logger.LogWarning("Order {OrderNumber} Hood type '{Name}' not found", orderDto.OrderNumber, type);
+            }
+
+            if (orderDto.Hood.TryGetValue("Name", out var setHood) && setHood != null)
+            {
+                var itemHood = setHood?.Trim().ToLower();
+                hood = string.IsNullOrEmpty(itemHood)
+                    ? null
+                    : await db.hood_type.FirstOrDefaultAsync(s => s.NameImport.Trim().ToLower().Contains(itemHood));
+
+                if (hood == null)
+                {
+                    //logger.LogWarning("Order {OrderNumber} Hood name '{Hood}' not found'", orderDto.OrderNumber, itemHood);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
+            }
+
+            if (hood == null && orderDto.Hood.TryGetValue("ShortName", out var setHoodShort) && setHoodShort != null)
+            {
+                var itemHood = setHoodShort?.Trim().ToLower();
+                hood = string.IsNullOrEmpty(itemHood)
+                    ? null
+                    : await db.hood_type.FirstOrDefaultAsync(s => s.NameImport.Trim().ToLower().Contains(itemHood));
+
+                if (hood == null)
+                {
+                    logger.LogWarning("Order {OrderNumber} Hood Short name '{Hood}' not found'", orderDto.OrderNumber, itemHood);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
+            }
+
+            if (item != null && hood != null)
+            {
+                var skus = await SkuService.FindSkusAsync(db, item.Id, null, null, hood.Id);
+                Sku sku;
+                if (skus.Count > 0)
+                {
+                    sku = skus[0];
+                    //logger.LogInformation("SKU found for Order {OrderNumber} Gown: ItemId={ItemId}, SizeId={SizeId}, FitId={FitId}, SKU Id={SkuId}", orderDto.OrderNumber, item.Id, size.Id, fit.Id, skus[0].Id);
+                }
+                else
+                {
+                    logger.LogWarning("SKU not found for Order {OrderNumber} Hood: ItemId={ItemId}, HoodId={HoodId}", orderDto.OrderNumber, item.Id, hood.Id);
+                    // Optionally, you could create a new SKU if it doesn't exist
+                    sku = await SkuService.InsertSkuAsync(db, item.Id, null, null, hood.Id);
+                    logger.LogInformation("Inserted new SKU for Order {OrderNumber} Hood: ItemId={ItemId}, HoodId={HoodId}", orderDto.OrderNumber, item.Id, hood.Id);
+                }
+                return ToOrderedItem(item, sku);
+            }
+            else
+            {
+                //logger.LogWarning("Order {OrderNumber} Hood: Missing item or hood. ItemId={ItemId}, HoodId={HoodId}", orderDto.OrderNumber, item?.Id, hood?.Id);
+            }
+            return null;
+        }
+
+        private static async Task<OrderedItems?> RetrievePhdHoodAsync(Dictionary<string, string?> hoodIn, OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+            Sizes? size = null;
+            Items? item = null;
+
+            if (hoodIn.TryGetValue("Type", out var type) && type != null)
+            {
+                //logger.LogInformation("Order {OrderNumber} Gown Type={Type}", orderDto.OrderNumber, type);
+
+                var itemName = type?.Trim().ToLower();
+
+                item = string.IsNullOrEmpty(itemName)
+                                                ? null
+                                                : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == "hood - phd");
+
+                if (item is null)
+                    logger.LogWarning("Order {OrderNumber} PhD Hood type '{Name}' not found", orderDto.OrderNumber, type);
+            }
+
+            if (orderDto.Hood.TryGetValue("Size", out var hoodSize) && hoodSize != null)
+            {
+                var itemSize = hoodSize?.Trim().ToLower();
+                size = string.IsNullOrEmpty(itemSize)
+                    ? null
+                    : await db.sizes.FirstOrDefaultAsync(s => s.Size.Trim().ToLower() == itemSize);
+
+                if (size == null)
+                {
+                    //logger.LogWarning("Order {OrderNumber} Hood name '{Hood}' not found'", orderDto.OrderNumber, itemHood);
+                }
+
+                //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
+            }
+
+            if (item != null && size != null)
+            {
+                var skus = await SkuService.FindSkusAsync(db, item.Id, size.Id);
+                Sku sku;
+                if (skus.Count > 0)
+                {
+                    sku = skus[0];
+                    //logger.LogInformation("SKU found for Order {OrderNumber} Gown: ItemId={ItemId}, SizeId={SizeId}, FitId={FitId}, SKU Id={SkuId}", orderDto.OrderNumber, item.Id, size.Id, fit.Id, skus[0].Id);
+                }
+                else
+                {
+                    logger.LogWarning("SKU not found for Order {OrderNumber} PhD Hood: ItemId={ItemId}, SizeId={SizeId}", orderDto.OrderNumber, item.Id, size.Id);
+                    // Optionally, you could create a new SKU if it doesn't exist
+                    sku = await SkuService.InsertSkuAsync(db, item.Id, size.Id);
+                    logger.LogInformation("Inserted new SKU for Order {OrderNumber} PhD Hood: ItemId={ItemId}, SizeId={SizeId}", orderDto.OrderNumber, item.Id, size.Id);
+                }
+                return ToOrderedItem(item, sku);
+            }
+            else
+            {
+                //logger.LogWarning("Order {OrderNumber} Hood: Missing item or hood. ItemId={ItemId}, HoodId={HoodId}", orderDto.OrderNumber, item?.Id, hood?.Id);
+            }
+            return null;
+        }
+
+        private static async Task<OrderedItems?> ProcessStoleAsync(OrderDtoIn orderDto, GownDb db, ILogger logger)
+        {
+
+            if (orderDto.Stole is { Count: > 0 })
+            {
+                Items? item = null;
+                Sizes? size = null;
+                if (orderDto.Stole.TryGetValue("Name", out var name) && name != null)
+                {
+                    //logger.LogInformation("Order {OrderNumber} Stole Name={Name}", orderDto.OrderNumber, name);
+
+                    var itemName = name?.Trim().ToLower();
+                    item = string.IsNullOrEmpty(itemName)
+                                                    ? null
+                                                    : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == itemName);
+
+                    if (item is null)
+                        logger.LogWarning("Order {OrderNumber} Stole item '{Name}' not found", orderDto.OrderNumber, name);
+                    //else
+                    //    logger.LogInformation("Order {OrderNumber} Stole item found: Id={ItemId}, Name={ItemName}", orderDto.OrderNumber, item.Id, item.Name);
+                }
+
+                if (orderDto.Stole.TryGetValue("Size", out var hatSize) && hatSize != null)
+                {
+                    var itemSize = hatSize?.Trim().ToLower();
+                    size = string.IsNullOrEmpty(itemSize)
+                        ? null
+                        : await db.sizes.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize);
+                    //logger.LogInformation("Order {OrderNumber} Stole Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, hatSize, size?.Id, size?.Size);
+                }
+                if (item != null && size != null)
+                {
+                    var skus = await SkuService.FindSkusAsync(db, item.Id, size.Id);
+                    Sku sku;
+                    if (skus.Count > 0)
+                    {
+                        sku = skus[0];
+                        //logger.LogInformation("SKU found for Order {OrderNumber} Stole: ItemId={ItemId}, SizeId={SizeId}, SKU Id={SkuId}", orderDto.OrderNumber, item.Id, size.Id, skus[0].Id);
+                    }
+                    else
+                    {
+                        logger.LogWarning("SKU not found for Order {OrderNumber} Stole: ItemId={ItemId}, SizeId={SizeId}", orderDto.OrderNumber, item.Id, size.Id);
+                        // Optionally, you could create a new SKU if it doesn't exist
+                        sku = await SkuService.InsertSkuAsync(db, item.Id, size.Id, null, null, size.Id);
+                        logger.LogInformation("Inserted new SKU for Order {OrderNumber} Stole: ItemId={ItemId}, SizeId={SizeId}", orderDto.OrderNumber, item.Id, size.Id);
+                    }
+                    return ToOrderedItem(item, sku);
+                }
+            }
+            else
+            {
+                logger.LogInformation("Order {OrderNumber} Stole: <empty>", orderDto.OrderNumber);
+            }
+            return null;
+        }
+
     }
 }

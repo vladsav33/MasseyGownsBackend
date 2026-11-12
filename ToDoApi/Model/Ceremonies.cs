@@ -4,6 +4,7 @@
     {
         public int? Id { get; set; }
         public string Name { get; set; }
+        public string? NameImport { get; set; }
         public DateOnly? CeremonyDate { get; set; }
         public DateOnly? CeremonyDate2 { get; set; }
         public int? CeremonyNo { get; set; }
@@ -30,5 +31,6 @@
         public string? CollectionTime { get; set; }
         public string? Content { get; set; }
         public int AccountCode { get; set; }
+        public string? ImportName { get; set; }
     }
 }

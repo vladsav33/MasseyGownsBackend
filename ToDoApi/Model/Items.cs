@@ -5,6 +5,7 @@ namespace GownApi.Model
     {
         public int Id { get; set; }
         public string Name { get; set; }
+        public string? NameImport { get; set; }
         public string? Type { get; set; }
         public byte[]? Picture { get; set; }
         public decimal? HirePrice { get; set; }

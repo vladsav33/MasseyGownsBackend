@@ -48,6 +48,117 @@ namespace GownApi.Services
             };
         }
 
+        public static async Task<Orders> ToEntity(OrderDtoIn dto, int ceremonyId, GownDb db)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            // Qualification arrives as text; match it to a degree by name (case-insensitive)
+            int? degreeId = null;
+            if (!string.IsNullOrWhiteSpace(dto.Qualification))
+            {
+                var qualification = dto.Qualification.Trim().ToLower();
+                degreeId = await db.degrees
+                    .Where(d => d.Name.ToLower() == qualification)
+                    .Select(d => (int?)d.Id)
+                    .FirstOrDefaultAsync();
+            }
+
+            var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
+            var nzNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, nzTz);
+
+            return new Orders
+            {
+                CeremonyId = ceremonyId,
+                FirstName = dto.FirstName?.Trim() ?? "",
+                LastName = dto.LastName?.Trim() ?? "",
+                Email = dto.Email?.Trim() ?? "",
+                Phone = dto.Phone?.Trim() ?? "",
+                Address = JoinNonEmpty(", ", dto.Address1, dto.Address2, dto.State),
+                City = dto.City?.Trim() ?? "",
+                Postcode = dto.Zip?.Trim() ?? "",
+                Country = dto.Country?.Trim() ?? "",
+                StudentId = int.TryParse(dto.StudentId?.Trim(), out var studentId) ? studentId : 0,
+                HeadSize = GetHeadSize(dto.Trencher),
+                DegreeId = degreeId,
+                OrderAmount = dto.TotalCost ?? 0,
+                AmountPaid = dto.AmountPaid,
+                AmountOwning = dto.AmountOwing,
+                Donation = 0,
+                Paid = dto.AmountOwing.HasValue ? dto.AmountOwing <= 0 : false,
+                PaymentMethod = int.TryParse(dto.PaymentMethod?.Trim(), out var paymentMethod) ? paymentMethod : null,
+                PaymentTxnId = NullIfEmpty(dto.PaymentReference),
+                ReferenceNo = NullIfEmpty(dto.OrderNumber),
+                Message = NullIfEmpty(dto.Comments),
+                Note = BuildNote(dto),
+                OrderDate = DateOnly.FromDateTime(nzNow),
+                CreatedAt = DateTime.UtcNow,
+            };
+        }
+
+        // The Orders table has no columns for the garments and extras, so keep them in Note
+        private static string? BuildNote(OrderDtoIn dto)
+        {
+            var parts = new List<string>();
+
+            void Add(string label, string? value)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    parts.Add($"{label}: {value.Trim()}");
+            }
+
+            // e.g. { "size": "M", "colour": "Black" } -> "Gown: size=M, colour=Black"
+            void AddDictionary(string label, Dictionary<string, string?>? values)
+            {
+                if (values is null) return;
+                Add(label, JoinNonEmpty(", ", values
+                    .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                    .Select(kv => $"{kv.Key}={kv.Value!.Trim()}")
+                    .ToArray()));
+            }
+
+            foreach (var gown in dto.Gown ?? [])
+                AddDictionary("Gown", gown);
+            AddDictionary("Hood", dto.Hood);
+            AddDictionary("Trencher", dto.Trencher);
+            Add("Bonnet", dto.Bonnet);
+            Add("Mortarboard", dto.Mortarboard);
+            Add("Korowai", dto.Korowai);
+            AddDictionary("Stole", dto.Stole);
+            Add("Hood pin", dto.HoodPin);
+            Add("Tie pin", dto.Tiepin);
+            Add("Keyring", dto.Keyring);
+            Add("Garment bag", dto.GarmentBag);
+            Add("Photography", dto.Photography);
+            Add("Prepaid return", dto.PrepaidReturn);
+            Add("Qualification", dto.Qualification);
+            Add("University", dto.University);
+            Add("Company", dto.Company);
+            Add("Supplier", dto.Supplier);
+            if (dto.Bond.HasValue)
+                parts.Add($"Bond: {dto.Bond.Value:0.00}");
+
+            return parts.Count == 0 ? null : string.Join("; ", parts);
+        }
+
+        // Trencher["Size"] (e.g. "57" or "57cm") -> head_size; key match is case-insensitive
+        private static int? GetHeadSize(Dictionary<string, string?>? trencher)
+        {
+            var size = trencher?
+                .FirstOrDefault(kv => string.Equals(kv.Key, "Size", StringComparison.OrdinalIgnoreCase))
+                .Value;
+            if (string.IsNullOrWhiteSpace(size))
+                return null;
+
+            var digits = new string(size.Trim().TakeWhile(char.IsDigit).ToArray());
+            return int.TryParse(digits, out var headSize) ? headSize : null;
+        }
+
+        private static string JoinNonEmpty(string separator, params string?[] values) =>
+            string.Join(separator, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim()));
+
+        private static string? NullIfEmpty(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
         public static async Task<OrderDtoOut> ToDtoOut(OrderGet order, GownDb db)
         {
             if (order == null)

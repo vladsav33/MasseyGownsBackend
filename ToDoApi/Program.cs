@@ -211,7 +211,7 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("CorrelationId", httpContext.Response.Headers["CorrelationID"].ToString());
         diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
         diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
-        diagnosticContext.Set("MerchantReference", httpContext.Items["MerchantReference"]?.ToString() ?? "NotCreatedYet");
+        diagnosticContext.Set("MerchantReference", httpContext.Items["MerchantReference"]?.ToString() ?? "Merchant Reference Not Created Yet");
     };
 });
 

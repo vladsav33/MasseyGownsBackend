@@ -32,5 +32,26 @@ namespace GownApi.Services
             return await query.ToListAsync();
         }
 
+        public static async Task<Sku> InsertSkuAsync(
+            GownDb db,
+            int itemId,
+            int? sizeId = null,
+            int? fitId = null,
+            int? hoodId = null,
+            int? hatId = null)
+        {
+            var sku = new Sku
+            {
+                ItemId = itemId,
+                SizeId = sizeId,
+                FitId = fitId,
+                HoodId = hoodId,
+                HatId = hatId,
+                Count = 0
+            };
+            db.Sku.Add(sku);
+            await db.SaveChangesAsync();
+            return sku;
+        }
     }
 }
