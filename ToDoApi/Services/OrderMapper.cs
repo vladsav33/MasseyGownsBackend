@@ -87,7 +87,9 @@ namespace GownApi.Services
                 Paid = dto.AmountOwing.HasValue ? dto.AmountOwing <= 0 : false,
                 PaymentMethod = int.TryParse(dto.PaymentMethod?.Trim(), out var paymentMethod) ? paymentMethod : null,
                 PaymentTxnId = NullIfEmpty(dto.PaymentReference),
+                PurchaseOrder = NullIfEmpty(dto.PurchaseOrder),
                 ReferenceNo = NullIfEmpty(dto.OrderNumber),
+                Staff = dto.Staff ?? false,
                 Message = NullIfEmpty(dto.Comments),
                 Note = BuildNote(dto),
                 OrderDate = DateOnly.FromDateTime(nzNow),
@@ -230,7 +232,8 @@ namespace GownApi.Services
                 PaymentTxnId = order.PaymentTxnId,
                 RefundLastEc = order.RefundLastEc,
                 RefundLastEm = order.RefundLastEm,
-                RefundStatusCode = order.RefundStatusCode
+                RefundStatusCode = order.RefundStatusCode,
+                Staff = order.Staff
             };
         }
 
@@ -273,7 +276,8 @@ namespace GownApi.Services
                 AdminCharges = order.AdminCharges,
                 PayBy = order.PayBy,
                 Status = order.Status,
-                ReferenceNo = order.ReferenceNo
+                ReferenceNo = order.ReferenceNo,
+                Staff = order.Staff,
             };
 
             return ToDtoOut(og, db);

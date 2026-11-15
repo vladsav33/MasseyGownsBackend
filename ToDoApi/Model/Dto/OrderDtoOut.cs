@@ -1,4 +1,6 @@
-﻿namespace GownApi.Model.Dto
+﻿using DocumentFormat.OpenXml.Bibliography;
+
+namespace GownApi.Model.Dto
 {
     public class OrderDtoOut
     {
@@ -51,6 +53,7 @@
         public int? RefundLastEc { get; set; }
         public string? RefundLastEm { get; set; }
         public RefundStatusCode RefundStatusCode { get; set; }
+        public bool? Staff { get; set; }
 
     }
 }

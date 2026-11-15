@@ -29,8 +29,10 @@
         public string? Phone { get; set; }
         public string? Photography { get; set; }
         public string? PrepaidReturn { get; set; }
+        public string? PurchaseOrder { get; set; }
         public string? Qualification { get; set; }
         public Dictionary<string, string?>? Stole { get; set; }
+        public bool? Staff { get; set; }
         public string? State { get; set; }
         public string? StudentId { get; set; }
         public string? Supplier { get; set; }

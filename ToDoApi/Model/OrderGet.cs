@@ -47,6 +47,7 @@
         public int? RefundLastEc { get; set; }
         public string? RefundLastEm { get; set; }
         public RefundStatusCode RefundStatusCode { get; set; }
+        public bool? Staff { get; set; }
 
 
     }

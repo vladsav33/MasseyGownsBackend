@@ -228,7 +228,7 @@ namespace GownApi.Endpoints
                     var itemName = name?.Trim().ToLower();
                     item = string.IsNullOrEmpty(itemName)
                                                     ? null
-                                                    : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == itemName);
+                                                    : await db.items.FirstOrDefaultAsync(i => i.NameImport.ToLower().Contains(itemName));
 
                     if (item is null)
                         logger.LogWarning("Order {OrderNumber} Trencher item '{Name}' not found", orderDto.OrderNumber, name);
@@ -236,12 +236,12 @@ namespace GownApi.Endpoints
                     //    logger.LogInformation("Order {OrderNumber} Trencher item found: Id={ItemId}, Name={ItemName}", orderDto.OrderNumber, item.Id, item.Name);
                 }
 
-                if (orderDto.Trencher.TryGetValue("Size", out var hatSize) && hatSize != null)
+                if (orderDto.Trencher.TryGetValue("Size", out var hatSize) && hatSize != null && item != null)
                 {
                     var itemSize = hatSize?.Trim().ToLower();
                     size = string.IsNullOrEmpty(itemSize)
                         ? null
-                        : await db.hats.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize);
+                        : await db.hats.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize && s.ItemId == item.Id);
                     //logger.LogInformation("Order {OrderNumber} Trencher Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, hatSize, size?.Id, size?.Size);
                 }
                 if (item != null && size != null)
@@ -279,10 +279,10 @@ namespace GownApi.Endpoints
             {
                 foreach (var gown in orderDto.Gown)
                 {
-                    if (gown.TryGetValue("Type", out var type) && type != null && type.Trim().ToLower().Contains("gown"))
-                        AddIfNotNull(orderedItems, await RetrieveGownAsync(gown, orderDto, db, logger));
-                    if (type != null && type.Trim().ToLower().Contains("doctoral set"))
+                    if (gown.TryGetValue("Type", out var type) && type != null && type.Trim().ToLower().Contains("set"))
                         AddIfNotNull(orderedItems, await RetrieveSetAsync(gown, orderDto, db, logger));
+                    else if (type != null)
+                        AddIfNotNull(orderedItems, await RetrieveGownAsync(gown, orderDto, db, logger));
                 }
             }
             else
@@ -305,7 +305,7 @@ namespace GownApi.Endpoints
                 var itemName = type?.Trim().ToLower();
                 item = string.IsNullOrEmpty(itemName)
                                                 ? null
-                                                : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == itemName);
+                                                : await db.items.FirstOrDefaultAsync(i => i.NameImport.ToLower() == itemName);
 
                 //if (item is null)
                 //    logger.LogWarning("Order {OrderNumber} Gown item '{Name}' not found", orderDto.OrderNumber, type);
@@ -328,12 +328,12 @@ namespace GownApi.Endpoints
                 //logger.LogInformation("Order {OrderNumber} Gown Fit={Fit} Fit Id={id}, Fit Name={Name}", orderDto.OrderNumber, gownFit, fit?.Id, fit?.FitType);
             }
 
-            if (gown.TryGetValue("Size", out var gownSize) && gownSize != null && fit != null)
+            if (gown.TryGetValue("Size", out var gownSize) && gownSize != null && fit != null && item != null)
             {
                 var itemSize = gownSize?.Trim().ToLower();
                 size = string.IsNullOrEmpty(itemSize)
                     ? null
-                    : await db.sizes.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize && s.FitId == fit.Id);
+                    : await db.sizes.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize && s.FitId == fit.Id && s.ItemId == item.Id);
 
                 if (size == null)
                 {
@@ -381,7 +381,7 @@ namespace GownApi.Endpoints
 
                 item = string.IsNullOrEmpty(itemName)
                                                 ? null
-                                                : await db.items.FirstOrDefaultAsync(i => i.Name.ToLower() == itemName);
+                                                : await db.items.FirstOrDefaultAsync(i => i.NameImport.ToLower().Contains(itemName));
 
                 if (item is null)
                     logger.LogWarning("Order {OrderNumber} Set item '{Name}' not found", orderDto.OrderNumber, type);
@@ -389,12 +389,12 @@ namespace GownApi.Endpoints
                     logger.LogInformation("Order {OrderNumber} Set item found: Id={ItemId}, Name={ItemName}", orderDto.OrderNumber, item.Id, item.Name);
             }
 
-            if (gown.TryGetValue("SetHatSize", out var setHat) && setHat != null)
+            if (gown.TryGetValue("SetHatSize", out var setHat) && setHat != null && item != null)
             {
                 var itemHat = setHat?.Trim().ToLower();
                 hat = string.IsNullOrEmpty(itemHat)
                     ? null
-                    : await db.hats.FirstOrDefaultAsync(h => h.Size.ToLower().Contains(itemHat));
+                    : await db.hats.FirstOrDefaultAsync(h => h.Size.ToLower().Contains(itemHat) && h.ItemId == item.Id);
 
                 if (hat == null)
                 {
@@ -404,12 +404,12 @@ namespace GownApi.Endpoints
                 //logger.LogInformation("Order {OrderNumber} Gown Fit={Fit} Fit Id={id}, Fit Name={Name}", orderDto.OrderNumber, gownFit, fit?.Id, fit?.FitType);
             }
 
-            if (gown.TryGetValue("Size", out var gownSize) && gownSize != null)
+            if (gown.TryGetValue("Size", out var gownSize) && gownSize != null && item != null)
             {
                 var itemSize = gownSize?.Trim().ToLower();
                 size = string.IsNullOrEmpty(itemSize)
                     ? null
-                    : await db.sizes.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize);
+                    : await db.sizes.FirstOrDefaultAsync(s => s.Size.ToLower() == itemSize && s.ItemId == item.Id);
 
                 if (size == null)
                 {

@@ -48,6 +48,7 @@
         public int? RefundLastEc { get; set; }
         public string? RefundLastEm { get; set; }
         public RefundStatusCode RefundStatusCode { get; set; } = RefundStatusCode.None;
+        public bool? Staff { get; set; }
         public DateTime? PaymentReminder1SentAt { get; set; }
         public DateTime? PaymentReminder2SentAt { get; set; }
     }

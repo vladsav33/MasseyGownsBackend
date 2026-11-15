@@ -76,7 +76,8 @@ namespace GownApi.Controllers
                         Address2 = null,
                         City = o.City ?? "",
                         Postcode = o.Postcode ?? "",
-                        Ceremony = c != null ? c.Name : "" //20260201
+                        Ceremony = c != null ? c.Name : "", //20260201,
+                        Staff = o.Staff ?? false
                     })
                     .ToListAsync();
 
@@ -131,7 +132,8 @@ namespace GownApi.Controllers
                     Address2 = null,
                     City = x.c.City ?? "",
                     Postcode = "",
-                    Ceremony = x.c.Name //20260201
+                    Ceremony = x.c.Name, //20260201
+                    //Staff = x.Staff ?? false
                 })
                 .ToListAsync();
 

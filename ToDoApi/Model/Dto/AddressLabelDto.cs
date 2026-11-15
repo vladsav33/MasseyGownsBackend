@@ -21,6 +21,7 @@
         public string Postcode { get; set; } = "";
 
         public string Ceremony { get; set; }  //20260201
+        public bool Staff { get; set; }
 
 
     }
