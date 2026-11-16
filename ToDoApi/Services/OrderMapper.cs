@@ -187,6 +187,7 @@ namespace GownApi.Services
             return new OrderDtoOut
             {
                 Id = order.Id,
+                IdCode = order.IDCode ?? "",
                 FirstName = order.FirstName,
                 LastName = order.LastName,
                 Email = order.Email,

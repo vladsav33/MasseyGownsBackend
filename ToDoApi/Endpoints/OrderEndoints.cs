@@ -1,10 +1,12 @@
 ﻿using DocumentFormat.OpenXml.Bibliography;
 using DocumentFormat.OpenXml.Drawing.Charts;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using GownApi.Model;
 using GownApi.Model.Dto;
 using GownApi.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Npgsql;
 using Serilog.Context;
 using System.CodeDom;
 
@@ -25,7 +27,8 @@ namespace GownApi.Endpoints
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
                                       o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
-                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
+                                      c.id_code  
                                       FROM orders o
                                       LEFT JOIN ceremonies c
                                       ON o.ceremony_id = c.id
@@ -39,12 +42,58 @@ namespace GownApi.Endpoints
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
                                       o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
-                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff
-                                      FROM orders o
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
+                                      c.id_code  
+                                     FROM orders o
                                       LEFT JOIN ceremonies c
                                       ON o.ceremony_id = c.id
                                       ORDER BY o.reference_no DESC")
                         .ToListAsync();
+
+                var resultList = new List<OrderDtoOut>();
+
+                foreach (var res in result)
+                {
+                    var order = await OrderMapper.ToDtoOut(res, db);
+                    resultList.Add(order);
+                }
+                return Results.Ok(resultList);
+            });
+
+            app.MapGet("/orders/ceremony/{idc}", async (int idc, GownDb db, bool? numbers = false) =>
+            {
+                string sql;
+                if (numbers == true)
+                    sql = @"SELECT o.id as id, o.first_name, UPPER(o.last_name) as last_name, o.email, o.address, o.city, o.height, o.head_size, o.payment_ec,
+                                      o.payment_em,o.postcode, o.country, o.phone,
+                                      o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
+                                      c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
+                                      o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
+                                      c.id_code  
+                                      FROM orders o
+                                      LEFT JOIN ceremonies c
+                                      ON o.ceremony_id = c.id
+                                      WHERE o.reference_no is not null AND c.id = @idc
+                                      ORDER BY o.reference_no DESC";
+                else
+                    sql = @"SELECT o.id as id, o.first_name, UPPER(o.last_name) as last_name, o.email, o.address, o.city, o.height, o.head_size, o.payment_ec,
+                                      o.payment_em,o.postcode, o.country, o.phone,
+                                      o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
+                                      c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
+                                      o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
+                                      c.id_code  
+                                      FROM orders o
+                                      LEFT JOIN ceremonies c
+                                      ON o.ceremony_id = c.id
+                                      WHERE c.id = @idc
+                                      ORDER BY o.reference_no DESC";
+
+                var param = new NpgsqlParameter("@idc", idc);
+                var result = await db.orderGets
+                    .FromSqlRaw(sql, param)
+                    .ToListAsync();
 
                 var resultList = new List<OrderDtoOut>();
 
