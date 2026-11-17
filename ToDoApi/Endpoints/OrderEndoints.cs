@@ -75,7 +75,7 @@ namespace GownApi.Endpoints
                                       LEFT JOIN ceremonies c
                                       ON o.ceremony_id = c.id
                                       WHERE o.reference_no is not null AND c.id = @idc
-                                      ORDER BY o.reference_no DESC";
+                                      ORDER BY last_name, first_name";
                 else
                     sql = @"SELECT o.id as id, o.first_name, UPPER(o.last_name) as last_name, o.email, o.address, o.city, o.height, o.head_size, o.payment_ec,
                                       o.payment_em,o.postcode, o.country, o.phone,
@@ -88,7 +88,7 @@ namespace GownApi.Endpoints
                                       LEFT JOIN ceremonies c
                                       ON o.ceremony_id = c.id
                                       WHERE c.id = @idc
-                                      ORDER BY o.reference_no DESC";
+                                      ORDER BY last_name, first_name";
 
                 var param = new NpgsqlParameter("@idc", idc);
                 var result = await db.orderGets
