@@ -15,7 +15,7 @@ namespace GownApi.Endpoints
         {
             app.MapGet("/items/{id}", async (int id, GownDb db) => {
                 var results = await db.Database.SqlQueryRaw<ItemDegreeModel>(@"
-                    SELECT DISTINCT i.id, cd.degree_id, d.name as degree_name, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, cdi.active
+                    SELECT DISTINCT i.id, cd.degree_id, d.name as degree_name, d.degree_order, i.name, i.picture, i.hire_price, i.buy_price, i.category, i.description, i.is_hiring, cdi.active
                     FROM public.items i
                     INNER JOIN public.ceremony_degree_item cdi ON i.id = cdi.item_id
                     INNER JOIN public.ceremony_degree cd on cdi.ceremony_degree_id = cd.id

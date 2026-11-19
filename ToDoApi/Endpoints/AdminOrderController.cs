@@ -77,11 +77,11 @@ namespace GownApi.Endpoints
 
             _ = app.MapGet("/admin/ordersbyceremony/{id}", async (int id, GownDb db) =>
             {
-                var sql = @"SELECT o.id as id, o.first_name, o.last_name, o.email, o.address, o.city, o.payment_ec, o.payment_em,o.postcode, o.country, o.phone,
+                var sql = @"SELECT o.id as id, c.id_code, o.first_name, o.last_name, o.head_size, o.height, o.email, o.address, o.city, o.payment_ec, o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
                                       o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
-                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at
+                                      o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff
                                       FROM orders o
                                       LEFT JOIN ceremonies c
                                       ON o.ceremony_id = c.id
@@ -120,7 +120,7 @@ namespace GownApi.Endpoints
                     var ceremonies = await db.ceremonies
                         .Where(c => c.Id != null && c.NameImport != null && c.NameImport != "")
                         .OrderBy(c => c.Id)
-                        .Select(c => new { Id = c.Id!.Value, c.NameImport })
+                        .Select(c => new { Id = c.Id!.Value, c.NameImport, c.InstitutionCode })
                         .ToListAsync();
 
                     var skipped = 0;
@@ -145,12 +145,13 @@ namespace GownApi.Endpoints
                                 orderDto.OrderNumber, orderDto.University, matches.Count, string.Join(", ", matches.Select(m => m.Id)), matches[0].Id);
 
                         var ceremonyId = matches[0].Id;
+                        var instituteCode = matches[0].InstitutionCode;
 
                         var orderedItems = new List<OrderedItems>();
 
                         AddIfNotNull(orderedItems, await ProcessTrencherAsync(orderDto, db, logger));
                         orderedItems.AddRange(await ProcessGownAsync(orderDto, db, logger));
-                        AddIfNotNull(orderedItems, await ProcessHoodAsync(orderDto, db, logger));
+                        AddIfNotNull(orderedItems, await ProcessHoodAsync(orderDto, db, logger, instituteCode));
                         AddIfNotNull(orderedItems, await ProcessStoleAsync(orderDto, db, logger));
 
                         var order = await OrderMapper.ToEntity(orderDto, ceremonyId, db);
@@ -459,7 +460,7 @@ namespace GownApi.Endpoints
             return null;
         }
 
-        private static async Task<OrderedItems?> ProcessHoodAsync(OrderDtoIn orderDto, GownDb db, ILogger logger)
+        private static async Task<OrderedItems?> ProcessHoodAsync(OrderDtoIn orderDto, GownDb db, ILogger logger, string? instituteCode)
         {
             if (orderDto.Hood is { Count: > 0 })
             {
@@ -468,13 +469,13 @@ namespace GownApi.Endpoints
                     return await RetrievePhdHoodAsync(orderDto.Hood, orderDto, db, logger);
                 } else if (orderDto.Hood.TryGetValue("Type", out var typePhd) && typePhd != null && typePhd.Trim().ToLower().Contains("hood"))
                 {
-                    return await RetrieveHoodAsync(orderDto.Hood, orderDto, db, logger);
+                    return await RetrieveHoodAsync(orderDto.Hood, orderDto, db, logger, instituteCode);
                 }
             }
             return null;
         }
 
-        private static async Task<OrderedItems?> RetrieveHoodAsync(Dictionary<string, string?> hoodIn, OrderDtoIn orderDto, GownDb db, ILogger logger)
+        private static async Task<OrderedItems?> RetrieveHoodAsync(Dictionary<string, string?> hoodIn, OrderDtoIn orderDto, GownDb db, ILogger logger, string? instituteCode)
         {
             HoodType? hood = null;
             Items? item = null;
@@ -493,27 +494,28 @@ namespace GownApi.Endpoints
                     logger.LogWarning("Order {OrderNumber} Hood type '{Name}' not found", orderDto.OrderNumber, type);
             }
 
-            if (orderDto.Hood.TryGetValue("Name", out var setHood) && setHood != null)
-            {
-                var itemHood = setHood?.Trim().ToLower();
-                hood = string.IsNullOrEmpty(itemHood)
-                    ? null
-                    : await db.hood_type.FirstOrDefaultAsync(s => s.NameImport.Trim().ToLower().Contains(itemHood));
+            //if (orderDto.Hood.TryGetValue("Name", out var setHood) && setHood != null)
+            //{
+            //    var itemHood = setHood?.Trim().ToLower();
+            //    hood = string.IsNullOrEmpty(itemHood)
+            //        ? null
+            //        : await db.hood_type.FirstOrDefaultAsync(s => s.NameImport.Trim().ToLower().Contains(itemHood) && s.Institution == "MU");
 
-                if (hood == null)
-                {
-                    //logger.LogWarning("Order {OrderNumber} Hood name '{Hood}' not found'", orderDto.OrderNumber, itemHood);
-                }
+            //    if (hood == null)
+            //    {
+            //        //logger.LogWarning("Order {OrderNumber} Hood name '{Hood}' not found'", orderDto.OrderNumber, itemHood);
+            //    }
 
-                //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
-            }
+            //    //logger.LogInformation("Order {OrderNumber} Hood Name={Name}", orderDto.OrderNumber, setHood);
+            //}
 
+            // If the hood was not found by Name, try to find it by ShortName
             if (hood == null && orderDto.Hood.TryGetValue("ShortName", out var setHoodShort) && setHoodShort != null)
             {
                 var itemHood = setHoodShort?.Trim().ToLower();
                 hood = string.IsNullOrEmpty(itemHood)
                     ? null
-                    : await db.hood_type.FirstOrDefaultAsync(s => s.NameImport.Trim().ToLower().Contains(itemHood));
+                    : await db.hood_type.FirstOrDefaultAsync(s => s.NameImport.Trim().ToLower() == itemHood && s.Institution == instituteCode);
 
                 if (hood == null)
                 {
