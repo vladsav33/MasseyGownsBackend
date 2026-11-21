@@ -164,7 +164,7 @@ namespace GownApi.Endpoints
 
                         logger.LogInformation("Student Id={order.StudentId}", order.Student_ID);
 
-                        if (order.Student_ID == 0)
+                        if (order.Student_ID == "")
                         {
                             return Results.NotFound("Student Id is null or missing");
                         }
@@ -173,7 +173,7 @@ namespace GownApi.Endpoints
                         {
                             Year = order.Year,
                             Location = order.Location,
-                            CeremonyName = order.Ceremony_full_name1,
+                            CeremonyName = order.Ceremony_name,
                             StudentId = order.Student_ID.ToString(),
                             Forename = order.Forename,
                             Surname = order.Surname,
