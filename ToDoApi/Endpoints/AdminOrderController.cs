@@ -43,13 +43,15 @@ namespace GownApi.Endpoints
                                 LIMIT 1
                             ) oi_selected ON true
                             WHERE o.ceremony_id = @id
+                            AND NOT o.staff
                             AND NOT EXISTS (
                                 SELECT 1 
                                 FROM ceremonies c
                                 JOIN session_ceremony sc ON sc.ceremony_id = c.id
                                 JOIN ceremony_import ci ON ci.ceremony_name = sc.session
                                 WHERE c.id = @id 
-                                  AND ci.student_id::numeric = o.student_id)";
+                                  AND ci.student_id::numeric = o.student_id)
+                            ORDER by o.last_name, o.first_name";
 
                 var param = new NpgsqlParameter("@id", id);
                 var result = await db.hiredNotGraduated.FromSqlRaw(sql, param).ToListAsync();
@@ -59,7 +61,8 @@ namespace GownApi.Endpoints
             _ = app.MapGet("/admin/graduatednothired/{id}", async(int id, GownDb db) =>
             {
                 var sql = @"
-                            SELECT ci.id, ci.student_id, ci.surname as last_name, ci.forename as first_name, ci.program_code as degree, c.id_code as ceremony_name, ci.program_desc as hood_name, ci.mobile FROM ceremony_import ci
+                            SELECT ci.id, ci.student_id, ci.surname as last_name, ci.forename as first_name, ci.program_code as degree, c.id_code as ceremony_name, ci.program_desc as hood_name, ci.mobile
+                            FROM ceremony_import ci
                             JOIN session_ceremony sc ON sc.session=ci.ceremony_name
                             JOIN ceremonies c ON c.id = sc.ceremony_id
                             WHERE c.id = @id
@@ -68,7 +71,8 @@ namespace GownApi.Endpoints
 	                            FROM orders o
 	                            WHERE o.student_id = CAST (ci.student_id AS NUMERIC)
 	                            AND o.ceremony_id = @id
-                            )";
+                            )
+                            ORDER BY last_name, first_name";
                 var param = new NpgsqlParameter("@id", id);
                 var result = await db.graduatedNotHired.FromSqlRaw(sql, param).ToListAsync();
 
