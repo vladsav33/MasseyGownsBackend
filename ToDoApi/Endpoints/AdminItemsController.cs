@@ -172,10 +172,10 @@ namespace GownApi.Endpoints
                 var sql = @"SELECT o.id as id, o.first_name, o.last_name, 
                                 STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown')  AS gown_size,
                                 STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Academic Gown') AS stole_size,
-                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Headwear') AS hat_size,
-                                STRING_AGG(h.short_name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_name,
+                                STRING_AGG(ha.labelsize, ', ') FILTER (WHERE i.category = 'Headwear') AS hat_size,
+                                STRING_AGG(h.name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_name,
                                 STRING_AGG(h.short_name, ', ') FILTER (WHERE i.category = 'Hood') AS hood_code,
-                                STRING_AGG(i.name, ', ') FILTER (WHERE i.category = 'Sash') AS sash_name
+                                STRING_AGG(s.labelsize, ', ') FILTER (WHERE i.category = 'Stole') AS sash_name
                                 FROM orders o
                                 INNER JOIN ordered_items oi
                                 ON oi.order_id = o.id
@@ -187,9 +187,11 @@ namespace GownApi.Endpoints
                                 ON sk.size_id = s.id
                                 LEFT JOIN hood_type h
                                 ON sk.hood_id = h.id
+								LEFT JOIN hats ha
+								ON sk.hat_id= ha.id
                                 WHERE i.category <> 'Donation' AND ceremony_id = @id
                                 GROUP BY o.id, o.first_name, o.last_name
-                                ORDER BY o.id";
+                                ORDER BY o.last_name, o.first_name";
 
                 var param = new NpgsqlParameter("@id", id);
 
@@ -256,19 +258,19 @@ namespace GownApi.Endpoints
             {
                 var category = "Headwear";
                 var sql = @"SELECT 
-                            s.labelsize AS item_size,
+                            h.labelsize AS item_size,
                             COUNT(*) AS item_count
                         FROM orders o
                         INNER JOIN ordered_items oi ON oi.order_id = o.id
                         INNER JOIN sku sk ON oi.sku_id = sk.id
                         INNER JOIN items i ON i.id = sk.item_id
-                        LEFT JOIN sizes s ON sk.size_id = s.id
+                        LEFT JOIN hats h ON sk.hat_id = h.id
                         WHERE i.category ILIKE @category
                           AND o.ceremony_id = @id
                         GROUP BY 
-                            s.labelsize
+                            h.labelsize
                         ORDER BY 
-                            s.labelsize";
+                            h.labelsize";
 
                 var result = new Dictionary<string, object>();
 

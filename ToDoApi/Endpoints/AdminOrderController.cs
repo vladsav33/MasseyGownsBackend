@@ -523,7 +523,7 @@ namespace GownApi.Endpoints
 
                 if (hood == null)
                 {
-                    logger.LogWarning("Order {OrderNumber} Hood Short name '{Hood}' not found'", orderDto.OrderNumber, itemHood);
+                    logger.LogWarning("Order {OrderNumber} Hood Short name '{Hood}' not found for the institution {Institution}", orderDto.OrderNumber, itemHood, instituteCode);
                 }
 
                 //logger.LogInformation("Order {OrderNumber} Gown Size={Size} Size Id={id}, Size Name={Name}", orderDto.OrderNumber, gownSize, size?.Id, size?.Size);
