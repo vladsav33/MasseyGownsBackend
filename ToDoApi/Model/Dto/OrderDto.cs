@@ -28,7 +28,7 @@
         public string? Changes { get; set; }
         public string? PackNote { get; set; }
         public decimal? AmountPaid { get; set; }
-        public decimal? AmountOwning { get; set; }
+        public decimal? AmountOwing { get; set; }
         public decimal? Donation { get; set; }
         public decimal? Freight { get; set; }
         public decimal? Refund { get; set; }

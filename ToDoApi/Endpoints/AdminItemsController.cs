@@ -280,6 +280,21 @@ namespace GownApi.Endpoints
                         new NpgsqlParameter("@category", category))
                     .ToListAsync();
 
+                sql = @"SELECT 
+                            s.labelsize AS item_size,
+                            COUNT(*) AS item_count
+                        FROM orders o
+                        INNER JOIN ordered_items oi ON oi.order_id = o.id
+                        INNER JOIN sku sk ON oi.sku_id = sk.id
+                        INNER JOIN items i ON i.id = sk.item_id
+                        LEFT JOIN sizes s ON sk.size_id = s.id
+                        WHERE i.category ILIKE @category
+                          AND o.ceremony_id = @id
+                        GROUP BY 
+                            s.labelsize
+                        ORDER BY 
+                            s.labelsize";
+
                 category = "Academic Gown";
                 result["gown"] = await db.Database
                     .SqlQueryRaw<ItemCountDto>(sql,

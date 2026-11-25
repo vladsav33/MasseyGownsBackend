@@ -517,6 +517,10 @@ namespace GownApi.Endpoints
             if (hood == null && orderDto.Hood.TryGetValue("ShortName", out var setHoodShort) && setHoodShort != null)
             {
                 var itemHood = setHoodShort?.Trim().ToLower();
+                if (orderDto.University.StartsWith("Casual Hire", StringComparison.OrdinalIgnoreCase))
+                {
+                    instituteCode = "MU";
+                }
                 hood = string.IsNullOrEmpty(itemHood)
                     ? null
                     : await db.hood_type.FirstOrDefaultAsync(s => s.NameImport.Trim().ToLower() == itemHood && s.Institution == instituteCode);

@@ -18,11 +18,13 @@ namespace GownApi.Model.Dto
         public string Phone { get; set; }
         public int Height { get; set; }
         public int HeadSize { get; set; }
+        public decimal Amount { get; set; }
         public decimal OrderAmount { get; set; }
+        public decimal? AmountPaid { get; set; }
+        public decimal? AmountOwing { get; set; }
         public int StudentId { get; set; }
         public string? Message { get; set; }
         public SelectedItemOut[] Items { get; set; }
-        public decimal Amount { get; set; }
         public bool Paid { get; set; }
         public int? PaymentMethod { get; set; }
         public string? PurchaseOrder { get; set; }
@@ -34,8 +36,6 @@ namespace GownApi.Model.Dto
         public string? Note { get; set; }
         public string? Changes { get; set; }
         public string? PackNote { get; set; }
-        public decimal? AmountPaid { get; set; }
-        public decimal? AmountOwning { get; set; }
         public decimal? Donation { get; set; }
         public int? AccountCode { get; set; }
         public decimal? Freight { get; set; }
@@ -47,14 +47,11 @@ namespace GownApi.Model.Dto
         public decimal? RefundedAmount { get; set; }// Added for refund details
         public string? RefundTxnId { get; set; }
         public DateTime? RefundedAt { get; set; }
-
         public DateTime? RefundEmailSentAt { get; set; }
         public string? PaymentTxnId { get; set; }
-
         public int? RefundLastEc { get; set; }
         public string? RefundLastEm { get; set; }
         public RefundStatusCode RefundStatusCode { get; set; }
         public bool? Staff { get; set; }
-
     }
 }

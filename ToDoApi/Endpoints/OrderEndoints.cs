@@ -26,7 +26,7 @@ namespace GownApi.Endpoints
                                       o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
-                                      o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.amount_owing, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
                                       o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
                                       c.id_code  
                                       FROM orders o
@@ -41,7 +41,7 @@ namespace GownApi.Endpoints
                                       o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
-                                      o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.amount_owing, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
                                       o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
                                       c.id_code  
                                      FROM orders o
@@ -68,7 +68,7 @@ namespace GownApi.Endpoints
                                       o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
-                                      o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.amount_owing, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
                                       o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
                                       c.id_code  
                                       FROM orders o
@@ -81,7 +81,7 @@ namespace GownApi.Endpoints
                                       o.payment_em,o.postcode, o.country, o.phone,
                                       o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                                       c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
-                                      o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                                      o.amount_owing, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
                                       o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
                                       c.id_code  
                                       FROM orders o
@@ -114,7 +114,7 @@ namespace GownApi.Endpoints
                            o.payment_em, o.postcode, o.country, o.phone,
                            o.order_amount, o.student_id, o.message, o.paid, o.payment_method, o.purchase_order, o.order_date, c.id as ceremony_id,
                            c.name as ceremony, o.degree_id, o.order_type, o.note, o.changes, o.pack_note, o.amount_paid,
-                           o.amount_owning, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
+                           o.amount_owing, o.donation, c.account_code, o.freight, o.refund, o.admin_charges, o.pay_by, o.status, o.reference_no,
                            o.refund_status_code, o.refund_txn_id, o.refunded_amount, o.refund_initiated_at, o.payment_txn_id, o.refund_last_ec, o.refund_last_em, o.refund_email_sent_at, o.staff,
                            oi.id as item_row_id, oi.cost as item_cost, oi.hire as item_hire, oi.quantity as item_quantity,
                            i.id as item_item_id, i.name as item_name,
@@ -197,7 +197,7 @@ namespace GownApi.Endpoints
                             PackNote = first.PackNote,
                             Changes = first.Changes,
                             AmountPaid = first.AmountPaid,
-                            AmountOwning = first.AmountOwning,
+                            AmountOwing = first.AmountOwing,
                             Donation = first.Donation,
                             AccountCode = first.AccountCode,
                             Freight = first.Freight,
@@ -388,7 +388,7 @@ namespace GownApi.Endpoints
                 order.Note = updatedOrder.Note;
                 order.Changes = updatedOrder.Changes;
                 order.AmountPaid = updatedOrder.AmountPaid;
-                order.AmountOwning = updatedOrder.AmountOwning;
+                order.AmountOwing = updatedOrder.AmountOwing;
                 order.Donation = updatedOrder.Donation;
                 order.Freight = updatedOrder.Freight;
                 order.Refund = updatedOrder.Refund;

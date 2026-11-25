@@ -14,7 +14,6 @@
         public string Postcode { get; set; }
         public string Country { get; set; }
         public string Phone { get; set; }
-        public decimal OrderAmount { get; set; }
         public int StudentId { get; set; }
         public int? Height { get; set; }
         public int? HeadSize { get; set; }
@@ -30,8 +29,9 @@
         public string? Note { get; set; }
         public string? Changes { get; set; }
         public string? PackNote { get; set; }
+        public decimal? OrderAmount { get; set; }
         public decimal? AmountPaid { get; set; }
-        public decimal? AmountOwning { get; set; }
+        public decimal? AmountOwing { get; set; }
         public decimal? Donation { get; set; }
         public decimal? Freight { get; set; }
         public int? AccountCode { get; set; }
